@@ -1,0 +1,1181 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Stress Loop Mini App</title>
+  <style>
+    :root{ --bg:#0b0c10; --card:#12141a; --muted:#9aa3b2; --fg:#e8ecf2; --accent:#5aa9ff; --good:#7ee787; --warn:#ffcc66; --bad:#ff6b6b; }
+    *{ box-sizing:border-box; }
+    body{ margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; background:var(--bg); color:var(--fg); }
+    header{ position:sticky; top:0; z-index:10; background:rgba(11,12,16,.92); backdrop-filter: blur(10px); border-bottom:1px solid rgba(255,255,255,.08); }
+    .wrap{ max-width:980px; margin:0 auto; padding:14px 16px; }
+    .topbar{ display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
+    .brand{ font-weight:800; letter-spacing:.2px; }
+    nav{ display:flex; gap:8px; flex-wrap:wrap; }
+
+    button, .btn{ appearance:none; border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.04); color:var(--fg); padding:10px 12px; border-radius:12px; cursor:pointer; font-weight:650; }
+    button:hover, .btn:hover{ border-color:rgba(255,255,255,.22); }
+    button:disabled{ opacity:.55; cursor:not-allowed; }
+    .btn.primary{ background:rgba(90,169,255,.16); border-color:rgba(90,169,255,.5); }
+    .btn.danger{ background:rgba(255,107,107,.12); border-color:rgba(255,107,107,.55); }
+    .btn.good{ background:rgba(126,231,135,.12); border-color:rgba(126,231,135,.55); }
+    .btn.small{ padding:7px 10px; border-radius:10px; font-weight:650; }
+    .btn.icon{ width:42px; padding:10px 0; text-align:center; }
+
+    main .wrap{ padding-top:18px; padding-bottom:26px; }
+
+    .grid{ display:grid; gap:14px; }
+    @media (min-width: 860px){ .grid.cols2{ grid-template-columns: 1.2fr .8fr; } }
+
+    .card{ background:var(--card); border:1px solid rgba(255,255,255,.10); border-radius:16px; padding:14px; box-shadow: 0 10px 30px rgba(0,0,0,.22); }
+    .card h2{ margin:0 0 10px; font-size:16px; }
+    .muted{ color:var(--muted); }
+    .row{ display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+    .spacer{ flex:1; }
+
+    label{ display:block; font-size:12px; color:var(--muted); margin:10px 0 6px; }
+    input, select, textarea{ width:100%; padding:10px 11px; border-radius:12px; border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.03); color:var(--fg); }
+    textarea{ min-height:84px; resize:vertical; }
+    input[type="range"]{ padding:0; }
+
+    .pill{ display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border-radius:999px; border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.03); font-size:12px; }
+    .pill .dot{ width:8px; height:8px; border-radius:50%; background:var(--muted); }
+    .pill.good .dot{ background:var(--good); }
+    .pill.warn .dot{ background:var(--warn); }
+    .pill.bad .dot{ background:var(--bad); }
+
+    table{ width:100%; border-collapse:collapse; }
+    th, td{ text-align:left; padding:9px 8px; border-bottom:1px solid rgba(255,255,255,.08); font-size:13px; vertical-align:top; }
+    th{ color:var(--muted); font-weight:800; font-size:12px; }
+
+    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    .kpi{ display:flex; gap:10px; flex-wrap:wrap; }
+    .kpi .box{ flex:1; min-width:170px; border-radius:14px; border:1px solid rgba(255,255,255,.10); background:rgba(255,255,255,.03); padding:12px; }
+    .kpi .val{ font-size:22px; font-weight:900; margin-top:6px; }
+
+    .note{ font-size:12px; color:var(--muted); line-height:1.4; }
+    .hr{ height:1px; background:rgba(255,255,255,.10); margin:12px 0; }
+
+    .toast{ position:fixed; left:50%; bottom:14px; transform:translateX(-50%); background:rgba(18,20,26,.96); border:1px solid rgba(255,255,255,.14); padding:10px 12px; border-radius:14px; display:none; z-index:999; max-width:92vw; }
+    .toast.show{ display:block; }
+
+    a{ color: var(--accent); }
+
+    .overlay{ position:fixed; inset:0; background:rgba(0,0,0,.55); display:grid; place-items:center; padding:16px; z-index:9999; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <div class="topbar">
+        <div class="row" style="gap:12px">
+          <div class="brand">Stress Loop Mini App</div>
+          <span class="pill" id="pillQuiet"><span class="dot"></span><span id="quietText">Quiet hours off</span></span>
+        </div>
+        <nav>
+          <button class="btn" data-route="dashboard">Dashboard</button>
+          <button class="btn primary" data-route="stress">Stress event</button>
+          <button class="btn" data-route="notes">Notes</button>
+          <button class="btn" data-route="settings">Settings</button>
+          <button class="btn" data-route="export">Export</button>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="wrap">
+      <div id="view"></div>
+      <div class="toast" id="toast"></div>
+    </div>
+  </main>
+
+<script>
+(function(){
+  const LS_KEY = "stress_loop_app_v4";
+  const NL = String.fromCharCode(10);
+
+  const iso = (d) => new Date(d).toISOString();
+  const fmt = (d) => new Date(d).toLocaleString();
+  const pad2 = (n) => String(n).padStart(2,"0");
+
+  function dateKey(d=new Date()){
+    return d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate());
+  }
+
+  function parseTimeHHMM(s){
+    if(!s || s.length !== 5) return null;
+    if(s.charAt(2) !== ":") return null;
+    const hh = Number(s.slice(0,2));
+    const mm = Number(s.slice(3,5));
+    if(!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
+    if(hh < 0 || hh > 23) return null;
+    if(mm < 0 || mm > 59) return null;
+    return { h: hh, m: mm };
+  }
+
+  function minutesSinceMidnight(d){ return d.getHours()*60 + d.getMinutes(); }
+
+  function inQuietHours(settings, d=new Date()){
+    const st = parseTimeHHMM(settings.quietStart);
+    const en = parseTimeHHMM(settings.quietEnd);
+    if(!st || !en) return false;
+    const t = minutesSinceMidnight(d);
+    const a = st.h*60 + st.m;
+    const b = en.h*60 + en.m;
+    if(a === b) return false;
+    if(a < b) return (t >= a && t < b);
+    return (t >= a || t < b);
+  }
+
+  function uid(){ return Math.random().toString(16).slice(2) + "-" + Date.now().toString(16); }
+
+  function toast(msg){
+    const el = document.getElementById("toast");
+    el.textContent = msg;
+    el.classList.add("show");
+    setTimeout(()=>el.classList.remove("show"), 2200);
+  }
+
+  function load(){
+    try{
+      const raw = localStorage.getItem(LS_KEY);
+      if(!raw) return null;
+      return JSON.parse(raw);
+    }catch(e){
+      console.warn("Failed to load", e);
+      return null;
+    }
+  }
+
+  function save(state){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
+
+  function defaultState(){
+    return {
+      settings: {
+        dailyCap: 8,
+        quietStart: "22:00",
+        quietEnd: "07:00",
+        stressTimerMin: 5,
+        dailyReviewEnabled: true,
+        dailyReviewTime: "20:00",
+        voiceLang: "en-CA"
+      },
+      stressEvents: [],
+      notes: [],
+      dailyReviews: [],
+      actionLibrary: [
+        "paced breathing",
+        "short walk",
+        "grounding (5-4-3-2-1)",
+        "stretch shoulders/neck",
+        "name the story (reappraisal)",
+        "micro-plan next step"
+      ],
+      actionStats: {}
+    };
+  }
+
+  function migrateState(s){
+    const base = defaultState();
+    const out = (s && typeof s === "object") ? s : {};
+    out.settings = Object.assign({}, base.settings, out.settings || {});
+    out.stressEvents = Array.isArray(out.stressEvents) ? out.stressEvents : [];
+    out.notes = Array.isArray(out.notes) ? out.notes : [];
+    out.dailyReviews = Array.isArray(out.dailyReviews) ? out.dailyReviews : [];
+    out.actionLibrary = Array.isArray(out.actionLibrary) && out.actionLibrary.length ? out.actionLibrary : base.actionLibrary.slice();
+    out.actionStats = (out.actionStats && typeof out.actionStats === "object") ? out.actionStats : {};
+    return out;
+  }
+
+  let STATE = migrateState(load());
+
+  function getSpeechRecognition(){ return window.SpeechRecognition || window.webkitSpeechRecognition || null; }
+
+  function startDictation(cfg){
+    const SR = getSpeechRecognition();
+    if(!SR){ cfg.onStatus && cfg.onStatus("not_supported"); return null; }
+
+    const rec = new SR();
+    rec.lang = cfg.lang || "en-CA";
+    rec.interimResults = true;
+    rec.continuous = false;
+
+    let finalText = "";
+
+    rec.onstart = ()=> cfg.onStatus && cfg.onStatus("listening");
+    rec.onerror = ()=> cfg.onStatus && cfg.onStatus("error");
+    rec.onend = ()=> cfg.onStatus && cfg.onStatus("stopped");
+
+    rec.onresult = (evt)=>{
+      let interim = "";
+      for(let i=evt.resultIndex; i<evt.results.length; i++){
+        const res = evt.results[i];
+        const txt = res[0].transcript;
+        if(res.isFinal) finalText += txt;
+        else interim += txt;
+      }
+      const combined = (finalText + (interim ? (" " + interim) : "")).trim();
+      cfg.onText && cfg.onText(combined);
+    };
+
+    try{ rec.start(); }catch(e){ cfg.onStatus && cfg.onStatus("error"); return null; }
+    return rec;
+  }
+
+  function normAction(s){ return String(s||"").trim(); }
+
+  function ensureActionInLibrary(name){
+    const n = normAction(name);
+    if(!n) return;
+    if(!STATE.actionLibrary.includes(n)) STATE.actionLibrary.unshift(n);
+  }
+
+  function updateActionStats(actionName, rating, worked, delta){
+    const a = normAction(actionName);
+    if(!a) return;
+    const st = STATE.actionStats[a] || { n:0, sumRating:0, nWorked:0, nDelta:0, sumDelta:0 };
+    if(Number.isFinite(rating)){ st.n += 1; st.sumRating += rating; }
+    if(worked === true) st.nWorked += 1;
+    if(Number.isFinite(delta)){ st.nDelta += 1; st.sumDelta += delta; }
+    STATE.actionStats[a] = st;
+  }
+
+  function topActions(limit){
+    const items = Object.entries(STATE.actionStats).map(([name, st])=>{
+      const avgRating = st.n ? (st.sumRating/st.n) : null;
+      const avgDelta = st.nDelta ? (st.sumDelta/st.nDelta) : null;
+      return { name, avgRating, avgDelta };
+    });
+
+    items.sort((x,y)=>{
+      const ax = (x.avgDelta==null) ? -1 : x.avgDelta;
+      const ay = (y.avgDelta==null) ? -1 : y.avgDelta;
+      if(ay !== ax) return ay - ax;
+      const rx = (x.avgRating==null) ? -1 : x.avgRating;
+      const ry = (y.avgRating==null) ? -1 : y.avgRating;
+      return ry - rx;
+    });
+
+    const best = items.slice(0, limit).map(x=>x.name);
+    for(const a of STATE.actionLibrary){
+      if(best.length>=limit) break;
+      if(!best.includes(a)) best.push(a);
+    }
+    return best;
+  }
+
+  function countTodayStress(){
+    const k = dateKey();
+    return STATE.stressEvents.filter(e => dateKey(new Date(e.createdAt)) === k).length;
+  }
+
+  function stressStatus(e){
+    if(e.outcome && e.outcome.at) return { label:"Complete", cls:"good" };
+    const endAt = e.timer && e.timer.endAt ? new Date(e.timer.endAt).getTime() : null;
+    if(endAt && Date.now() >= endAt) return { label:"Timer done: evaluate", cls:"warn" };
+    if(endAt) return { label:"Timer running", cls:"" };
+    return { label:"In progress", cls:"" };
+  }
+
+  function avg(xs){
+    const v = xs.filter(Number.isFinite);
+    if(!v.length) return null;
+    return v.reduce((a,b)=>a+b,0)/v.length;
+  }
+
+  function avgDeltaAll(){ return avg(STATE.stressEvents.map(e=>e.outcome && e.outcome.delta)); }
+  function avgRatingAll(){ return avg(STATE.stressEvents.map(e=>e.outcome && e.outcome.rating)); }
+
+  function workedRateAll(){
+    const xs = STATE.stressEvents.map(e=>e.outcome && e.outcome.worked).filter(v=>v===true || v===false);
+    if(!xs.length) return null;
+    return xs.filter(v=>v===true).length / xs.length;
+  }
+
+  // Daily review prompt (best-effort while open)
+  let reviewPromptedDate = null;
+  let reviewTimer = null;
+
+  function shouldPromptDailyReview(now){
+    if(!STATE.settings.dailyReviewEnabled) return false;
+    const tk = dateKey(now);
+    if(reviewPromptedDate === tk) return false;
+    if(STATE.dailyReviews.some(r => r.date === tk)) return false;
+    const tset = parseTimeHHMM(STATE.settings.dailyReviewTime);
+    if(!tset) return false;
+    return minutesSinceMidnight(now) >= (tset.h*60 + tset.m);
+  }
+
+  function startDailyReviewWatcher(){
+    if(reviewTimer) clearInterval(reviewTimer);
+    reviewTimer = setInterval(()=>{
+      if(shouldPromptDailyReview(new Date())){
+        reviewPromptedDate = dateKey(new Date());
+        openDailyReviewModal();
+      }
+    }, 30000);
+  }
+
+  // Router
+  const view = document.getElementById("view");
+
+  function setRoute(r){ window.location.hash = r; }
+  function getRoute(){ return (window.location.hash || "#dashboard").slice(1); }
+
+  document.querySelectorAll("button[data-route]").forEach(b => {
+    b.addEventListener("click", () => setRoute(b.getAttribute("data-route")));
+  });
+  window.addEventListener("hashchange", render);
+
+  function render(){
+    const q = inQuietHours(STATE.settings, new Date());
+    const pill = document.getElementById("pillQuiet");
+    const qt = document.getElementById("quietText");
+    qt.textContent = q ? "Quiet hours ON ("+STATE.settings.quietStart+"–"+STATE.settings.quietEnd+")" : "Quiet hours OFF ("+STATE.settings.quietStart+"–"+STATE.settings.quietEnd+")";
+    pill.className = "pill " + (q ? "warn" : "");
+
+    if(shouldPromptDailyReview(new Date())){
+      reviewPromptedDate = dateKey(new Date());
+      openDailyReviewModal();
+    }
+
+    const r = getRoute();
+    if(r.startsWith("stress/")) return renderStressEvent(r.split("/")[1]);
+    if(r === "dashboard") return renderDashboard();
+    if(r === "stress") return renderStressNew();
+    if(r === "notes") return renderNotes();
+    if(r === "settings") return renderSettings();
+    if(r === "export") return renderExport();
+    return renderDashboard();
+  }
+
+  function renderDashboard(){
+    const quiet = inQuietHours(STATE.settings);
+    const cap = STATE.settings.dailyCap;
+    const todayN = countTodayStress();
+    const eligibleNow = (!quiet && todayN < cap);
+
+    const dAvg = avgDeltaAll();
+    const rAvg = avgRatingAll();
+    const wRate = workedRateAll();
+
+    const today = dateKey();
+    const reviewDone = STATE.dailyReviews.some(r => r.date === today);
+
+    const top = topActions(5);
+
+    const rows = STATE.stressEvents.slice().sort((a,b)=> new Date(b.createdAt) - new Date(a.createdAt)).map(e => {
+      const st = stressStatus(e);
+      const actionName = e.action && e.action.name ? escapeHtml(e.action.name) : "—";
+      const delta = (e.outcome && Number.isFinite(e.outcome.delta)) ? e.outcome.delta : null;
+      const deltaTxt = (delta==null) ? "—" : (delta>=0 ? "+"+delta.toFixed(1) : delta.toFixed(1));
+      const rating = (e.outcome && Number.isFinite(e.outcome.rating)) ? e.outcome.rating.toFixed(1) : "—";
+      return "<tr>"+
+        "<td><a href=\"#stress/"+e.id+"\" class=\"btn small\" style=\"text-decoration:none\">Open</a></td>"+
+        "<td>"+fmt(e.createdAt)+"</td>"+
+        "<td><span class=\"pill "+st.cls+"\"><span class=\"dot\"></span>"+st.label+"</span></td>"+
+        "<td>"+actionName+"</td>"+
+        "<td>"+deltaTxt+"</td>"+
+        "<td>"+rating+"</td>"+
+      "</tr>";
+    }).join("");
+
+    view.innerHTML =
+      "<div class=\"grid cols2\">"+
+        "<div class=\"card\">"+
+          "<h2>Dashboard</h2>"+
+          "<div class=\"kpi\">"+
+            "<div class=\"box\"><div class=\"muted\">Stress events (total)</div><div class=\"val\">"+STATE.stressEvents.length+"</div></div>"+
+            "<div class=\"box\"><div class=\"muted\">Completed (evaluated)</div><div class=\"val\">"+STATE.stressEvents.filter(e=>e.outcome && e.outcome.at).length+"</div></div>"+
+            "<div class=\"box\"><div class=\"muted\">Today (cap "+cap+")</div><div class=\"val\">"+todayN+"</div></div>"+
+          "</div>"+
+          "<div class=\"hr\"></div>"+
+          "<div class=\"kpi\">"+
+            "<div class=\"box\"><div class=\"muted\">Avg improvement Δ (start − end)</div><div class=\"val\">"+(dAvg==null?"—":dAvg.toFixed(2))+"</div></div>"+
+            "<div class=\"box\"><div class=\"muted\">Avg rating (0–10)</div><div class=\"val\">"+(rAvg==null?"—":rAvg.toFixed(2))+"</div></div>"+
+            "<div class=\"box\"><div class=\"muted\">Worked rate</div><div class=\"val\">"+(wRate==null?"—":Math.round(wRate*100)+"%")+"</div></div>"+
+          "</div>"+
+          "<div class=\"hr\"></div>"+
+          "<div class=\"row\">"+
+            "<button class=\"btn primary\" id=\"btnNew\" "+(eligibleNow?"": "disabled")+">New stress event</button>"+
+            "<button class=\"btn\" id=\"btnReview\">Daily check-in</button>"+
+            "<div class=\"spacer\"></div>"+
+            "<span class=\"note\">Daily check-in: <b>"+(reviewDone?"Done":"Not yet")+"</b> • Eligible: <b>"+(eligibleNow?"Yes":"No")+"</b> ("+(quiet?"quiet hours":(todayN>=cap?"daily cap reached":"ok"))+ ")</span>"+
+          "</div>"+
+          "<p class=\"note\" style=\"margin-top:10px\">Top actions: <b>"+top.map(escapeHtml).join(", ")+"</b></p>"+
+        "</div>"+
+        "<div class=\"card\">"+
+          "<h2>What’s due?</h2>"+
+          "<div id=\"dueList\"></div>"+
+          "<p class=\"note\">If you close the app/browser, just open the event later and evaluate.</p>"+
+        "</div>"+
+      "</div>"+
+      "<div class=\"card\" style=\"margin-top:14px\">"+
+        "<h2>Stress events</h2>"+
+        "<div style=\"overflow:auto\">"+
+          "<table><thead><tr><th>Open</th><th>Created</th><th>Status</th><th>Action</th><th>Δ</th><th>Rating</th></tr></thead>"+
+          "<tbody>"+(rows || "<tr><td colspan=\"6\" class=\"muted\">No stress events yet. Tap “New stress event”.</td></tr>")+"</tbody></table>"+
+        "</div>"+
+      "</div>";
+
+    document.getElementById("btnNew").addEventListener("click", ()=>setRoute("stress"));
+    document.getElementById("btnReview").addEventListener("click", ()=>openDailyReviewModal());
+    renderDueList();
+  }
+
+  function renderDueList(){
+    const due = STATE.stressEvents
+      .map(e => ({ e, st: stressStatus(e) }))
+      .filter(x => x.st.label.indexOf("evaluate") >= 0)
+      .sort((a,b)=> new Date(a.e.createdAt) - new Date(b.e.createdAt));
+
+    const el = document.getElementById("dueList");
+    if(!el) return;
+    if(!due.length){ el.innerHTML = "<p class=\"muted\">Nothing due right now.</p>"; return; }
+
+    el.innerHTML = due.map(x =>
+      "<div class=\"row\" style=\"margin:10px 0\">"+
+        "<span class=\"pill "+x.st.cls+"\"><span class=\"dot\"></span>"+x.st.label+"</span>"+
+        "<span class=\"muted\">"+fmt(x.e.createdAt)+"</span>"+
+        "<div class=\"spacer\"></div>"+
+        "<a class=\"btn small\" href=\"#stress/"+x.e.id+"\" style=\"text-decoration:none\">Open</a>"+
+      "</div>"
+    ).join("");
+  }
+
+  function renderStressNew(){
+    const quiet = inQuietHours(STATE.settings);
+    const todayN = countTodayStress();
+    const cap = STATE.settings.dailyCap;
+    const disabled = quiet || (todayN >= cap);
+
+    const suggestions = topActions(10);
+
+    view.innerHTML =
+      "<div class=\"card\">"+
+        "<h2>Stress event</h2>"+
+        "<p class=\"note\">Step 1: rate your stress and what happened. Step 2: choose an action and start a <b>"+STATE.settings.stressTimerMin+"-minute</b> timer. Step 3: evaluate how you feel after.</p>"+
+        "<div class=\"row\" style=\"margin-top:10px\">"+
+          "<span class=\"pill\"><span class=\"dot\"></span>Suggestions: <b>"+suggestions.slice(0,4).map(escapeHtml).join(", ")+"</b></span>"+
+          "<div class=\"spacer\"></div>"+
+          "<span class=\"note\">Today: "+todayN+"/"+cap+" "+(quiet?"(quiet hours)":"")+"</span>"+
+        "</div>"+
+        "<div class=\"hr\"></div>"+
+
+        "<h2>Step 1: right now</h2>"+
+        "<label>State</label>"+
+        "<select id=\"state\">"+
+          "<option>stressed</option><option>anxious</option><option>angry</option><option>overwhelmed</option><option>sad</option><option>focused</option><option>calm</option><option>other</option>"+
+        "</select>"+
+
+        "<label>Stress intensity now (0–10)</label>"+
+        "<div class=\"row\">"+
+          "<input id=\"int0\" type=\"range\" min=\"0\" max=\"10\" step=\"1\" value=\"5\" style=\"flex:1\" />"+
+          "<div class=\"pill\"><span class=\"dot\"></span><span id=\"int0Val\">5</span>/10</div>"+
+        "</div>"+
+
+        "<label>What happened? (1–2 lines)</label>"+
+        "<textarea id=\"what\" placeholder=\"Example: argument, deadline, uncertainty, rumination…\"></textarea>"+
+
+        "<label>Context</label>"+
+        "<select id=\"context\">"+
+          "<option>work</option><option>home</option><option>commute</option><option>social</option><option>exercise</option><option>rest</option><option>other</option>"+
+        "</select>"+
+
+        "<div class=\"hr\"></div>"+
+
+        "<h2>Step 2: do something now</h2>"+
+        "<label>Choose an action</label>"+
+        "<div class=\"row\">"+
+          "<select id=\"action\" style=\"flex:1\">"+
+            suggestions.map(a=>"<option>"+escapeHtml(a)+"</option>").join("")+
+          "</select>"+
+          "<button class=\"btn icon\" id=\"addAction\" title=\"Add new action\">＋</button>"+
+        "</div>"+
+
+        "<label>Action details (optional)</label>"+
+        "<textarea id=\"actionNote\" placeholder=\"Example: 4-6 breathing, walk outside, drink water…\"></textarea>"+
+
+        "<div class=\"hr\"></div>"+
+
+        "<div class=\"row\">"+
+          "<button class=\"btn primary\" id=\"start\" "+(disabled?"disabled":"")+">Start timer</button>"+
+          "<button class=\"btn\" id=\"cancel\">Cancel</button>"+
+          "<div class=\"spacer\"></div>"+
+          "<span class=\"note\">"+(disabled?"Not eligible right now (quiet hours or daily cap).":"Eligible now.")+"</span>"+
+        "</div>"+
+      "</div>";
+
+    const int0 = document.getElementById("int0");
+    const int0Val = document.getElementById("int0Val");
+    int0.addEventListener("input", ()=> int0Val.textContent = int0.value);
+
+    document.getElementById("cancel").addEventListener("click", ()=>setRoute("dashboard"));
+
+    document.getElementById("addAction").addEventListener("click", ()=>{
+      const name = prompt("New action (example: cold water splash, walk outside, call a friend):");
+      if(!name) return;
+      ensureActionInLibrary(name);
+      save(STATE);
+      toast("Added");
+      render();
+    });
+
+    document.getElementById("start").addEventListener("click", ()=>{
+      const t = new Date();
+      const mins = Math.max(1, Math.min(60, Number(STATE.settings.stressTimerMin) || 5));
+
+      const baseline = {
+        state: document.getElementById("state").value,
+        intensity0: Number(int0.value),
+        what: document.getElementById("what").value.trim(),
+        context: document.getElementById("context").value
+      };
+
+      const actionName = normAction(document.getElementById("action").value);
+      const actionNote = document.getElementById("actionNote").value.trim();
+
+      ensureActionInLibrary(actionName);
+
+      const ev = {
+        id: uid(),
+        createdAt: iso(t),
+        baseline,
+        action: { name: actionName, note: actionNote },
+        timer: { min: mins, startAt: iso(t), endAt: iso(new Date(t.getTime() + mins*60*1000)) },
+        outcome: null
+      };
+
+      STATE.stressEvents.push(ev);
+      save(STATE);
+      toast("Timer started");
+      setRoute("stress/"+ev.id);
+    });
+  }
+
+  let timerTick = null;
+
+  function renderStressEvent(id){
+    const e = STATE.stressEvents.find(x => x.id === id);
+    if(!e){
+      view.innerHTML = "<div class=\"card\"><h2>Not found</h2><p class=\"muted\">This stress event no longer exists.</p><button class=\"btn\" id=\"back\">Back</button></div>";
+      document.getElementById("back").addEventListener("click", ()=>setRoute("dashboard"));
+      return;
+    }
+
+    const st = stressStatus(e);
+    const endAtMs = e.timer && e.timer.endAt ? new Date(e.timer.endAt).getTime() : null;
+    const remainingMs = endAtMs ? Math.max(0, endAtMs - Date.now()) : 0;
+    const mm = Math.floor(remainingMs/60000);
+    const ss = Math.floor((remainingMs%60000)/1000);
+    const remainingTxt = endAtMs ? (mm+":"+pad2(ss)) : "—";
+
+    const b = e.baseline || {};
+    const a = e.action || {};
+
+    const deltaTxt = (e.outcome && Number.isFinite(e.outcome.delta)) ? (e.outcome.delta>=0?"+"+e.outcome.delta.toFixed(1):e.outcome.delta.toFixed(1)) : "—";
+    const ratingTxt = (e.outcome && Number.isFinite(e.outcome.rating)) ? e.outcome.rating.toFixed(1) : "—";
+    const workedTxt = (e.outcome && e.outcome.worked===true) ? "Yes" : ((e.outcome && e.outcome.worked===false) ? "No" : "—");
+
+    view.innerHTML =
+      "<div class=\"grid cols2\">"+
+        "<div class=\"card\">"+
+          "<div class=\"row\">"+
+            "<h2 style=\"margin:0\">Stress event</h2>"+
+            "<span class=\"pill "+st.cls+"\"><span class=\"dot\"></span>"+st.label+"</span>"+
+            "<div class=\"spacer\"></div>"+
+            "<button class=\"btn danger\" id=\"del\">Delete</button>"+
+          "</div>"+
+
+          "<p class=\"note\">Created: <span class=\"mono\">"+fmt(e.createdAt)+"</span> • Timer: <b>"+(e.timer?e.timer.min:STATE.settings.stressTimerMin)+" min</b></p>"+
+
+          "<div class=\"hr\"></div>"+
+
+          "<h2>Step 1: baseline</h2>"+
+          "<div class=\"row\">"+
+            "<span class=\"pill\"><span class=\"dot\"></span>State: <b>"+escapeHtml(b.state||"—")+"</b></span>"+
+            "<span class=\"pill\"><span class=\"dot\"></span>Intensity start: <b>"+(Number.isFinite(b.intensity0)?b.intensity0:"—")+"/10</b></span>"+
+            "<span class=\"pill\"><span class=\"dot\"></span>Context: <b>"+escapeHtml(b.context||"—")+"</b></span>"+
+          "</div>"+
+          (b.what ? ("<p class=\"note\" style=\"margin-top:8px\">What happened: "+escapeHtml(b.what)+"</p>") : "")+
+
+          "<div class=\"hr\"></div>"+
+
+          "<h2>Step 2: action</h2>"+
+          "<div class=\"row\">"+
+            "<span class=\"pill\"><span class=\"dot\"></span>Action: <b>"+escapeHtml(a.name||"—")+"</b></span>"+
+          "</div>"+
+          (a.note ? ("<p class=\"note\" style=\"margin-top:8px\">Details: "+escapeHtml(a.note)+"</p>") : "")+
+
+          "<div class=\"hr\"></div>"+
+
+          "<h2>Timer</h2>"+
+          "<div class=\"row\">"+
+            "<span class=\"pill good\"><span class=\"dot\"></span><b>"+remainingTxt+"</b> remaining</span>"+
+            "<div class=\"spacer\"></div>"+
+            "<button class=\"btn primary\" id=\"eval\" "+((e.outcome && e.outcome.at)?"disabled":"")+">Evaluate now</button>"+
+          "</div>"+
+
+          "<div class=\"hr\"></div>"+
+
+          "<h2>Step 3: evaluation</h2>"+
+          "<div class=\"row\">"+
+            "<span class=\"pill\"><span class=\"dot\"></span>Worked: <b>"+workedTxt+"</b></span>"+
+            "<span class=\"pill\"><span class=\"dot\"></span>Rating: <b>"+ratingTxt+"</b>/10</span>"+
+            "<span class=\"pill\"><span class=\"dot\"></span>Improvement Δ: <b>"+deltaTxt+"</b></span>"+
+          "</div>"+
+          ((e.outcome && e.outcome.note) ? ("<p class=\"note\" style=\"margin-top:8px\">Note: "+escapeHtml(e.outcome.note)+"</p>") : "")+
+
+          "<div class=\"hr\"></div>"+
+          "<div class=\"row\">"+
+            "<button class=\"btn\" id=\"back\">Back</button>"+
+          "</div>"+
+        "</div>"+
+
+        "<div class=\"card\">"+
+          "<h2>What the app learns</h2>"+
+          "<p class=\"note\">Next time, actions with bigger Δ (more improvement) are suggested higher.</p>"+
+          "<div class=\"hr\"></div>"+
+          "<h2>Raw record</h2>"+
+          "<pre class=\"mono\" style=\"white-space:pre-wrap; word-break:break-word; font-size:12px; margin:0\">"+escapeHtml(JSON.stringify(e, null, 2))+"</pre>"+
+        "</div>"+
+      "</div>";
+
+    document.getElementById("back").addEventListener("click", ()=>setRoute("dashboard"));
+
+    document.getElementById("del").addEventListener("click", ()=>{
+      if(!confirm("Delete this stress event?")) return;
+      STATE.stressEvents = STATE.stressEvents.filter(x => x.id !== e.id);
+      save(STATE);
+      toast("Deleted");
+      setRoute("dashboard");
+    });
+
+    document.getElementById("eval").addEventListener("click", ()=> openStressEvaluationModal(e.id));
+
+    if(timerTick) clearInterval(timerTick);
+    timerTick = setInterval(()=>{
+      if(getRoute() === ("stress/"+id)){
+        const ev = STATE.stressEvents.find(x => x.id === id);
+        if(!ev) return;
+        const endMs = ev.timer && ev.timer.endAt ? new Date(ev.timer.endAt).getTime() : null;
+        if(endMs && Date.now() >= endMs && !(ev.outcome && ev.outcome.at)){
+          clearInterval(timerTick);
+          timerTick = null;
+          openStressEvaluationModal(id, { auto:true });
+          return;
+        }
+        render();
+      }
+    }, 1000);
+  }
+
+  function openStressEvaluationModal(eventId, opts){
+    const e = STATE.stressEvents.find(x => x.id === eventId);
+    if(!e) return;
+    if(e.outcome && e.outcome.at){ toast("Already evaluated"); return; }
+
+    const b = e.baseline || {};
+
+    const modal = document.createElement("div");
+    modal.className = "overlay";
+
+    modal.innerHTML =
+      "<div class=\"card\" style=\"max-width:760px; width:100%\">"+
+        "<div class=\"row\">"+
+          "<h2 style=\"margin:0\">Step 3: evaluate after "+(e.timer?e.timer.min:STATE.settings.stressTimerMin)+" min</h2>"+
+          "<div class=\"spacer\"></div>"+
+          "<button class=\"btn\" id=\"close\">Close</button>"+
+        "</div>"+
+        "<p class=\"note\">Action: <b>"+escapeHtml(e.action && e.action.name ? e.action.name : "—")+"</b></p>"+
+
+        "<label>Stress intensity now (0–10)</label>"+
+        "<input id=\"int1\" type=\"range\" min=\"0\" max=\"10\" step=\"1\" value=\""+(Number.isFinite(b.intensity0)?b.intensity0:5)+"\" />"+
+        "<div class=\"row\" style=\"margin-top:8px\"><span class=\"pill\"><span class=\"dot\"></span><span id=\"iVal\">"+(Number.isFinite(b.intensity0)?b.intensity0:5)+"</span>/10</span></div>"+
+
+        "<label>Did it work?</label>"+
+        "<select id=\"worked\"><option value=\"unsure\">Unsure</option><option value=\"yes\">Yes</option><option value=\"no\">No</option></select>"+
+
+        "<label>How helpful was it? (0–10)</label>"+
+        "<input id=\"rating\" type=\"range\" min=\"0\" max=\"10\" step=\"1\" value=\"5\" />"+
+        "<div class=\"row\" style=\"margin-top:8px\"><span class=\"pill\"><span class=\"dot\"></span><span id=\"rVal\">5</span>/10</span></div>"+
+
+        "<label>Optional note</label>"+
+        "<textarea id=\"note\" placeholder=\"What helped / what did not? (optional)\"></textarea>"+
+
+        "<div class=\"hr\"></div>"+
+        "<div class=\"row\">"+
+          "<button class=\"btn primary\" id=\"save\">Save evaluation</button>"+
+          "<div class=\"spacer\"></div>"+
+          "<span class=\"note\">This computes improvement Δ = (start − end).</span>"+
+        "</div>"+
+      "</div>";
+
+    document.body.appendChild(modal);
+
+    const int1 = modal.querySelector("#int1");
+    const iVal = modal.querySelector("#iVal");
+    int1.addEventListener("input", ()=> iVal.textContent = int1.value);
+
+    const rating = modal.querySelector("#rating");
+    const rVal = modal.querySelector("#rVal");
+    rating.addEventListener("input", ()=> rVal.textContent = rating.value);
+
+    modal.querySelector("#close").addEventListener("click", ()=> modal.remove());
+
+    modal.querySelector("#save").addEventListener("click", ()=>{
+      const ev = STATE.stressEvents.find(x => x.id === eventId);
+      if(!ev) return;
+
+      const workedSel = modal.querySelector("#worked").value;
+      const worked = (workedSel === "yes") ? true : ((workedSel === "no") ? false : null);
+      const rat = Number(rating.value);
+      const intensity1 = Number(int1.value);
+
+      const intensity0 = Number.isFinite(ev.baseline && ev.baseline.intensity0) ? ev.baseline.intensity0 : null;
+      const delta = (Number.isFinite(intensity0) && Number.isFinite(intensity1)) ? (intensity0 - intensity1) : null;
+
+      ev.outcome = {
+        at: iso(new Date()),
+        intensity1,
+        worked,
+        rating: rat,
+        delta,
+        note: modal.querySelector("#note").value.trim()
+      };
+
+      ensureActionInLibrary(ev.action && ev.action.name);
+      updateActionStats(ev.action && ev.action.name, rat, worked === true, delta);
+
+      save(STATE);
+      toast("Saved");
+      modal.remove();
+      render();
+    });
+
+    if(opts && opts.auto){ toast("Timer done — please evaluate"); }
+  }
+
+  function renderNotes(){
+    const entries = STATE.notes.slice().sort((a,b)=> new Date(b.createdAt) - new Date(a.createdAt));
+    const srSupported = !!getSpeechRecognition();
+
+    const rows = entries.map(n =>
+      "<tr>"+
+        "<td>"+fmt(n.createdAt)+"</td>"+
+        "<td>"+escapeHtml(n.text || "")+"</td>"+
+        "<td>"+
+          "<button class=\"btn small\" data-share=\""+n.id+"\">Share</button>"+
+          "<button class=\"btn small danger\" data-del=\""+n.id+"\">Delete</button>"+
+        "</td>"+
+      "</tr>"
+    ).join("");
+
+    view.innerHTML =
+      "<div class=\"grid cols2\">"+
+        "<div class=\"card\">"+
+          "<h2>Notes (any time)</h2>"+
+          "<p class=\"note\">Write a note any time. Voice dictation depends on your browser.</p>"+
+
+          "<label>Time</label>"+
+          "<input id=\"nat\" type=\"datetime-local\" />"+
+
+          "<label>Note</label>"+
+          "<textarea id=\"ntext\" placeholder=\"How do I feel right now? (typed or dictated)\"></textarea>"+
+
+          "<div class=\"row\" style=\"margin-top:10px\">"+
+            "<button class=\"btn\" id=\"dictate\" "+(srSupported?"":"disabled")+">🎙️ Dictate</button>"+
+            "<button class=\"btn\" id=\"stopDict\" disabled>Stop</button>"+
+            "<span class=\"pill\" id=\"dictPill\"><span class=\"dot\"></span><span id=\"dictTxt\">"+(srSupported?"Ready":"Voice not supported in this browser")+"</span></span>"+
+            "<div class=\"spacer\"></div>"+
+            "<button class=\"btn primary\" id=\"save\">Save note</button>"+
+          "</div>"+
+        "</div>"+
+
+        "<div class=\"card\">"+
+          "<h2>Recent notes</h2>"+
+          "<div style=\"overflow:auto; max-height:540px\">"+
+            "<table><thead><tr><th>Time</th><th>Text</th><th>Actions</th></tr></thead>"+
+            "<tbody>"+(rows || "<tr><td colspan=\"3\" class=\"muted\">No notes yet.</td></tr>")+"</tbody></table>"+
+          "</div>"+
+        "</div>"+
+      "</div>";
+
+    const dt = new Date();
+    const dtLocal = dt.getFullYear()+"-"+pad2(dt.getMonth()+1)+"-"+pad2(dt.getDate())+"T"+pad2(dt.getHours())+":"+pad2(dt.getMinutes());
+    document.getElementById("nat").value = dtLocal;
+
+    const ntext = document.getElementById("ntext");
+    const dictateBtn = document.getElementById("dictate");
+    const stopBtn = document.getElementById("stopDict");
+    const dictTxt = document.getElementById("dictTxt");
+    const dictPill = document.getElementById("dictPill");
+
+    let rec = null;
+
+    function setDictStatus(kind){
+      if(kind === "listening"){
+        dictTxt.textContent = "Listening…";
+        dictPill.className = "pill good";
+        stopBtn.disabled = false;
+        dictateBtn.disabled = true;
+      }else if(kind === "stopped"){
+        dictTxt.textContent = "Stopped";
+        dictPill.className = "pill";
+        stopBtn.disabled = true;
+        dictateBtn.disabled = !srSupported;
+      }else if(kind === "error"){
+        dictTxt.textContent = "Voice error (try again)";
+        dictPill.className = "pill bad";
+        stopBtn.disabled = true;
+        dictateBtn.disabled = !srSupported;
+      }else{
+        dictTxt.textContent = srSupported ? "Ready" : "Voice not supported";
+        dictPill.className = "pill";
+        stopBtn.disabled = true;
+        dictateBtn.disabled = !srSupported;
+      }
+    }
+
+    if(srSupported){
+      dictateBtn.addEventListener("click", ()=>{
+        rec = startDictation({
+          lang: STATE.settings.voiceLang,
+          onText: (txt)=>{ ntext.value = txt; },
+          onStatus: (s)=>{
+            if(s === "listening") setDictStatus("listening");
+            else if(s === "stopped") setDictStatus("stopped");
+            else setDictStatus("error");
+          }
+        });
+      });
+      stopBtn.addEventListener("click", ()=>{ try{ rec && rec.stop(); }catch(e){} });
+    }
+
+    document.getElementById("save").addEventListener("click", ()=>{
+      const at = document.getElementById("nat").value;
+      const d = at ? new Date(at) : new Date();
+      const text = ntext.value.trim();
+      if(!text){ toast("Nothing to save"); return; }
+      STATE.notes.push({ id: uid(), createdAt: iso(d), text });
+      save(STATE);
+      toast("Saved");
+      render();
+    });
+
+    view.querySelectorAll("[data-del]").forEach(btn => {
+      btn.addEventListener("click", ()=>{
+        const id = btn.getAttribute("data-del");
+        if(!confirm("Delete this note?")) return;
+        STATE.notes = STATE.notes.filter(x => x.id !== id);
+        save(STATE);
+        toast("Deleted");
+        render();
+      });
+    });
+
+    view.querySelectorAll("[data-share]").forEach(btn => {
+      btn.addEventListener("click", async ()=>{
+        const id = btn.getAttribute("data-share");
+        const n = STATE.notes.find(x => x.id === id);
+        if(!n) return;
+
+        const payload = fmt(n.createdAt) + NL + NL + n.text;
+
+        if(navigator.share){
+          try{ await navigator.share({ text: payload, title: "Note" }); toast("Shared"); }
+          catch(e){ toast("Share cancelled"); }
+        }else if(navigator.clipboard){
+          try{ await navigator.clipboard.writeText(payload); toast("Copied"); }
+          catch(e){ toast("Copy failed"); }
+        }else{
+          alert(payload);
+        }
+      });
+    });
+  }
+
+  function openDailyReviewModal(){
+    const today = dateKey();
+    const existing = STATE.dailyReviews.find(r => r.date === today) || null;
+
+    const modal = document.createElement("div");
+    modal.className = "overlay";
+
+    modal.innerHTML =
+      "<div class=\"card\" style=\"max-width:760px; width:100%\">"+
+        "<div class=\"row\">"+
+          "<h2 style=\"margin:0\">Daily check-in ("+today+")</h2>"+
+          "<div class=\"spacer\"></div>"+
+          "<button class=\"btn\" id=\"close\">Close</button>"+
+        "</div>"+
+        "<p class=\"note\">How was your day, what you achieved, what to do better tomorrow.</p>"+
+
+        "<label>Overall day rating (0–10)</label>"+
+        "<input id=\"rating\" type=\"range\" min=\"0\" max=\"10\" step=\"1\" value=\""+(existing?existing.rating:5)+"\" />"+
+        "<div class=\"row\" style=\"margin-top:8px\"><span class=\"pill\"><span class=\"dot\"></span><span id=\"rVal\">"+(existing?existing.rating:5)+"</span>/10</span></div>"+
+
+        "<label>What did you achieve today?</label>"+
+        "<textarea id=\"ach\" placeholder=\"1–3 bullets\">"+(existing?escapeHtml(existing.achieved||""):"")+"</textarea>"+
+
+        "<label>What can be better tomorrow?</label>"+
+        "<textarea id=\"imp\" placeholder=\"1–2 things\">"+(existing?escapeHtml(existing.improve||""):"")+"</textarea>"+
+
+        "<label>Optional note</label>"+
+        "<textarea id=\"note\" placeholder=\"Anything else?\">"+(existing?escapeHtml(existing.note||""):"")+"</textarea>"+
+
+        "<div class=\"hr\"></div>"+
+        "<div class=\"row\">"+
+          "<button class=\"btn primary\" id=\"save\">Save</button>"+
+          "<button class=\"btn danger\" id=\"del\" "+(existing?"":"disabled")+">Delete</button>"+
+          "<div class=\"spacer\"></div>"+
+          "<span class=\"note\">Reminder shows when app is open after "+STATE.settings.dailyReviewTime+".</span>"+
+        "</div>"+
+      "</div>";
+
+    document.body.appendChild(modal);
+
+    const rating = modal.querySelector("#rating");
+    const rVal = modal.querySelector("#rVal");
+    rating.addEventListener("input", ()=> rVal.textContent = rating.value);
+
+    modal.querySelector("#close").addEventListener("click", ()=> modal.remove());
+
+    modal.querySelector("#save").addEventListener("click", ()=>{
+      const entry = {
+        date: today,
+        at: iso(new Date()),
+        rating: Number(rating.value),
+        achieved: modal.querySelector("#ach").value.trim(),
+        improve: modal.querySelector("#imp").value.trim(),
+        note: modal.querySelector("#note").value.trim()
+      };
+      STATE.dailyReviews = STATE.dailyReviews.filter(r => r.date !== today);
+      STATE.dailyReviews.push(entry);
+      save(STATE);
+      toast("Saved");
+      modal.remove();
+      render();
+    });
+
+    modal.querySelector("#del").addEventListener("click", ()=>{
+      if(!existing) return;
+      if(!confirm("Delete today's daily check-in?")) return;
+      STATE.dailyReviews = STATE.dailyReviews.filter(r => r.date !== today);
+      save(STATE);
+      toast("Deleted");
+      modal.remove();
+      render();
+    });
+  }
+
+  function renderSettings(){
+    const s = STATE.settings;
+
+    view.innerHTML =
+      "<div class=\"card\">"+
+        "<h2>Settings</h2>"+
+
+        "<div class=\"grid\" style=\"grid-template-columns:1fr; gap:0\">"+
+          "<label>Daily cap (max stress events/day)</label>"+
+          "<input id=\"cap\" type=\"number\" min=\"0\" max=\"30\" value=\""+s.dailyCap+"\" />"+
+
+          "<label>Quiet hours start</label>"+
+          "<input id=\"qs\" type=\"time\" value=\""+s.quietStart+"\" />"+
+
+          "<label>Quiet hours end</label>"+
+          "<input id=\"qe\" type=\"time\" value=\""+s.quietEnd+"\" />"+
+
+          "<label>Stress timer minutes</label>"+
+          "<input id=\"tm\" type=\"number\" min=\"1\" max=\"30\" value=\""+s.stressTimerMin+"\" />"+
+
+          "<label>Daily check-in reminder</label>"+
+          "<div class=\"row\">"+
+            "<select id=\"dre\">"+
+              "<option value=\"true\" "+(s.dailyReviewEnabled?"selected":"")+">Enabled</option>"+
+              "<option value=\"false\" "+(!s.dailyReviewEnabled?"selected":"")+">Disabled</option>"+
+            "</select>"+
+            "<input id=\"drt\" type=\"time\" value=\""+s.dailyReviewTime+"\" />"+
+          "</div>"+
+
+          "<label>Voice dictation language (if supported)</label>"+
+          "<input id=\"lang\" type=\"text\" value=\""+escapeHtml(s.voiceLang)+"\" placeholder=\"en-CA\" />"+
+        "</div>"+
+
+        "<div class=\"hr\"></div>"+
+        "<div class=\"row\">"+
+          "<button class=\"btn primary\" id=\"save\">Save settings</button>"+
+          "<button class=\"btn\" id=\"reset\">Reset app (wipe all data)</button>"+
+          "<div class=\"spacer\"></div>"+
+          "<button class=\"btn\" id=\"back\">Back</button>"+
+        "</div>"+
+      "</div>";
+
+    document.getElementById("back").addEventListener("click", ()=>setRoute("dashboard"));
+
+    document.getElementById("save").addEventListener("click", ()=>{
+      const cap = Number(document.getElementById("cap").value);
+      const tm = Number(document.getElementById("tm").value);
+
+      STATE.settings.dailyCap = Number.isFinite(cap) ? Math.max(0, Math.min(30, cap)) : STATE.settings.dailyCap;
+      STATE.settings.quietStart = document.getElementById("qs").value || STATE.settings.quietStart;
+      STATE.settings.quietEnd = document.getElementById("qe").value || STATE.settings.quietEnd;
+      STATE.settings.stressTimerMin = Number.isFinite(tm) ? Math.max(1, Math.min(30, tm)) : STATE.settings.stressTimerMin;
+
+      STATE.settings.dailyReviewEnabled = document.getElementById("dre").value === "true";
+      STATE.settings.dailyReviewTime = document.getElementById("drt").value || STATE.settings.dailyReviewTime;
+      STATE.settings.voiceLang = (document.getElementById("lang").value || STATE.settings.voiceLang).trim();
+
+      save(STATE);
+      toast("Settings saved");
+      render();
+    });
+
+    document.getElementById("reset").addEventListener("click", ()=>{
+      if(!confirm("This will delete ALL stress events, notes, reviews, and settings. Continue?")) return;
+      STATE = defaultState();
+      save(STATE);
+      toast("Reset");
+      render();
+    });
+  }
+
+  function renderExport(){
+    view.innerHTML =
+      "<div class=\"grid cols2\">"+
+        "<div class=\"card\">"+
+          "<h2>Export</h2>"+
+          "<div class=\"row\">"+
+            "<button class=\"btn primary\" id=\"csvS\">Stress CSV</button>"+
+            "<button class=\"btn\" id=\"csvN\">Notes CSV</button>"+
+            "<button class=\"btn\" id=\"csvR\">Daily CSV</button>"+
+            "<button class=\"btn\" id=\"json\">JSON backup</button>"+
+            "<div class=\"spacer\"></div>"+
+            "<button class=\"btn\" id=\"back\">Back</button>"+
+          "</div>"+
+
+          "<div class=\"hr\"></div>"+
+          "<h2>Copy/paste JSON backup</h2>"+
+          "<textarea id=\"blob\" class=\"mono\" style=\"min-height:220px\"></textarea>"+
+          "<div class=\"row\" style=\"margin-top:10px\">"+
+            "<button class=\"btn\" id=\"copy\">Copy</button>"+
+          "</div>"+
+        "</div>"+
+
+        "<div class=\"card\">"+
+          "<h2>Reminder note</h2>"+
+          "<p class=\"note\">Phone browsers do not reliably run scheduled tasks in the background. Daily check-in reminder shows when the app is open after your set time.</p>"+
+        "</div>"+
+      "</div>";
+
+    document.getElementById("back").addEventListener("click", ()=>setRoute("dashboard"));
+
+    const blob = document.getElementById("blob");
+    blob.value = JSON.stringify(STATE, null, 2);
+
+    document.getElementById("copy").addEventListener("click", async ()=>{
+      try{ await navigator.clipboard.writeText(blob.value); toast("Copied"); }
+      catch(e){ toast("Copy failed"); }
+    });
+
+    document.getElementById("json").addEventListener("click", ()=>{
+      download("stress_loop_data.json", JSON.stringify(STATE, null, 2), "application/json");
+    });
+
+    document.getElementById("csvS").addEventListener("click", ()=>{
+      download("stress_loop_stress_events.csv", toStressCSV(STATE.stressEvents), "text/csv");
+    });
+
+    document.getElementById("csvN").addEventListener("click", ()=>{
+      download("stress_loop_notes.csv", toNotesCSV(STATE.notes), "text/csv");
+    });
+
+    document.getElementById("csvR").addEventListener("click", ()=>{
+      download("stress_loop_daily_reviews.csv", toReviewsCSV(STATE.dailyReviews), "text/csv");
+    });
+  }
+
+  function download(filename, content, mime){
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 1000);
+    toast("Download started");
+  }
+
+  function escCSV(v){
+    if(v==null) return "";
+    const s = String(v);
+    const needs = s.includes("\"") || s.includes(",") || (s.indexOf(NL) >= 0);
+    if(!needs) return s;
+    return "\"" + s.replaceAll("\"", "\"\"") + "\"";
+  }
+
+  function toStressCSV(events){
+    const cols = [
+      "id","createdAt",
+      "baseline_state","baseline_intensity0","baseline_context","baseline_what",
+      "action_name","action_note",
+      "timer_min","timer_startAt","timer_endAt",
+      "outcome_at","outcome_intensity1","outcome_worked","outcome_rating","outcome_delta","outcome_note"
+    ];
+    const lines = [cols.join(",")];
+    for(const e of events){
+      lines.push([
+        e.id, e.createdAt,
+        e.baseline && e.baseline.state,
+        e.baseline && e.baseline.intensity0,
+        e.baseline && e.baseline.context,
+        e.baseline && e.baseline.what,
+        e.action && e.action.name,
+        e.action && e.action.note,
+        e.timer && e.timer.min,
+        e.timer && e.timer.startAt,
+        e.timer && e.timer.endAt,
+        e.outcome && e.outcome.at,
+        e.outcome && e.outcome.intensity1,
+        e.outcome && e.outcome.worked,
+        e.outcome && e.outcome.rating,
+        e.outcome && e.outcome.delta,
+        e.outcome && e.outcome.note
+      ].map(escCSV).join(","));
+    }
+    return lines.join(NL);
+  }
+
+  function toNotesCSV(notes){
+    const cols = ["id","createdAt","text"];
+    const lines = [cols.join(",")];
+    for(const n of notes){ lines.push([n.id, n.createdAt, n.text].map(escCSV).join(",")); }
+    return lines.join(NL);
+  }
+
+  function toReviewsCSV(reviews){
+    const cols = ["date","at","rating","achieved","improve","note"];
+    const lines = [cols.join(",")];
+    for(const r of reviews){ lines.push([r.date, r.at, r.rating, r.achieved, r.improve, r.note].map(escCSV).join(",")); }
+    return lines.join(NL);
+  }
+
+  function escapeHtml(s){
+    return String(s||"")
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll("\"","&quot;")
+      .replaceAll("'","&#039;");
+  }
+
+  startDailyReviewWatcher();
+  render();
+})();
+</script>
+</body>
+</html>
