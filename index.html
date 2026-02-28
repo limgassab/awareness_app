@@ -4,6 +4,17 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Stress Loop Mini App</title>
+
+  <!-- PWA: make it installable -->
+  <link rel="manifest" href="./manifest.webmanifest">
+  <meta name="theme-color" content="#0b0c10">
+
+  <!-- iOS “app-like” hints -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="./icon-192.png">
+  <link rel="icon" href="./icon-192.png">
+
   <style>
     :root{ --bg:#0b0c10; --card:#12141a; --muted:#9aa3b2; --fg:#e8ecf2; --accent:#5aa9ff; --good:#7ee787; --warn:#ffcc66; --bad:#ff6b6b; }
     *{ box-sizing:border-box; }
@@ -93,7 +104,32 @@
 
 <script>
 (function(){
+  // IMPORTANT:
+  // Keep this key stable. Changing it makes the app look “empty”.
   const LS_KEY = "stress_loop_app_v4";
+
+  // Auto-migrate if you ever used older keys
+  const FALLBACK_KEYS = [
+    "stress_loop_app_v4",
+    "stress_loop_app_v3",
+    "stress_loop_app_v2",
+    "stress_loop_app_v1",
+    "stress_loop_app_v0"
+  ];
+
+  // PWA/offline + “please don’t delete my storage” (best-effort)
+  try{
+    if (navigator.storage && navigator.storage.persist) {
+      navigator.storage.persist().catch(()=>{});
+    }
+  }catch(e){}
+
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("./sw.js").catch(()=>{});
+    });
+  }
+
   const NL = String.fromCharCode(10);
 
   const iso = (d) => new Date(d).toISOString();
@@ -133,23 +169,47 @@
 
   function toast(msg){
     const el = document.getElementById("toast");
+    if(!el) return;
     el.textContent = msg;
     el.classList.add("show");
     setTimeout(()=>el.classList.remove("show"), 2200);
   }
 
-  function load(){
+  function loadFromKey(key){
     try{
-      const raw = localStorage.getItem(LS_KEY);
+      const raw = localStorage.getItem(key);
       if(!raw) return null;
       return JSON.parse(raw);
     }catch(e){
-      console.warn("Failed to load", e);
       return null;
     }
   }
 
-  function save(state){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
+  function loadAny(){
+    // first try current key
+    const primary = loadFromKey(LS_KEY);
+    if(primary) return { data: primary, key: LS_KEY };
+
+    // then try older keys
+    for(const k of FALLBACK_KEYS){
+      if(k === LS_KEY) continue;
+      const d = loadFromKey(k);
+      if(d) return { data: d, key: k };
+    }
+    return null;
+  }
+
+  function save(state){
+    try{
+      localStorage.setItem(LS_KEY, JSON.stringify(state));
+      return true;
+    }catch(e){
+      // If storage is blocked (private mode / quota), warn once.
+      console.warn("Save failed", e);
+      toast("Save failed (storage blocked?)");
+      return false;
+    }
+  }
 
   function defaultState(){
     return {
@@ -189,7 +249,15 @@
     return out;
   }
 
-  let STATE = migrateState(load());
+  // Load state (and migrate from older keys if needed)
+  const loaded = loadAny();
+  let STATE = migrateState(loaded ? loaded.data : null);
+  if(loaded && loaded.key !== LS_KEY){
+    // save migrated data into the new key so it’s stable going forward
+    save(STATE);
+    // optional: tell you once
+    // toast("Imported previous data");
+  }
 
   function getSpeechRecognition(){ return window.SpeechRecognition || window.webkitSpeechRecognition || null; }
 
@@ -350,6 +418,9 @@
     if(r === "export") return renderExport();
     return renderDashboard();
   }
+
+  // --- Everything below here is your original logic (unchanged) ---
+  // (I kept your code as-is; only edits were PWA + persistence + migration + safer save.)
 
   function renderDashboard(){
     const quiet = inQuietHours(STATE.settings);
