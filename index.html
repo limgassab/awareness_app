@@ -5,11 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Stress Loop Mini App</title>
 
-  <!-- PWA: make it installable -->
+  <!-- PWA -->
   <link rel="manifest" href="./manifest.webmanifest">
   <meta name="theme-color" content="#0b0c10">
-
-  <!-- iOS “app-like” hints -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="apple-touch-icon" href="./icon-192.png">
@@ -72,7 +70,6 @@
     .toast.show{ display:block; }
 
     a{ color: var(--accent); }
-
     .overlay{ position:fixed; inset:0; background:rgba(0,0,0,.55); display:grid; place-items:center; padding:16px; z-index:9999; }
   </style>
 </head>
@@ -104,33 +101,22 @@
 
 <script>
 (function(){
-  // IMPORTANT:
-  // Keep this key stable. Changing it makes the app look “empty”.
   const LS_KEY = "stress_loop_app_v4";
+  const NL = String.fromCharCode(10);
 
-  // Auto-migrate if you ever used older keys
-  const FALLBACK_KEYS = [
-    "stress_loop_app_v4",
-    "stress_loop_app_v3",
-    "stress_loop_app_v2",
-    "stress_loop_app_v1",
-    "stress_loop_app_v0"
-  ];
-
-  // PWA/offline + “please don’t delete my storage” (best-effort)
+  // Best-effort: keep storage longer
   try{
     if (navigator.storage && navigator.storage.persist) {
       navigator.storage.persist().catch(()=>{});
     }
   }catch(e){}
 
+  // Register service worker
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
       navigator.serviceWorker.register("./sw.js").catch(()=>{});
     });
   }
-
-  const NL = String.fromCharCode(10);
 
   const iso = (d) => new Date(d).toISOString();
   const fmt = (d) => new Date(d).toLocaleString();
@@ -175,28 +161,15 @@
     setTimeout(()=>el.classList.remove("show"), 2200);
   }
 
-  function loadFromKey(key){
+  function load(){
     try{
-      const raw = localStorage.getItem(key);
+      const raw = localStorage.getItem(LS_KEY);
       if(!raw) return null;
       return JSON.parse(raw);
     }catch(e){
+      console.warn("Failed to load", e);
       return null;
     }
-  }
-
-  function loadAny(){
-    // first try current key
-    const primary = loadFromKey(LS_KEY);
-    if(primary) return { data: primary, key: LS_KEY };
-
-    // then try older keys
-    for(const k of FALLBACK_KEYS){
-      if(k === LS_KEY) continue;
-      const d = loadFromKey(k);
-      if(d) return { data: d, key: k };
-    }
-    return null;
   }
 
   function save(state){
@@ -204,7 +177,6 @@
       localStorage.setItem(LS_KEY, JSON.stringify(state));
       return true;
     }catch(e){
-      // If storage is blocked (private mode / quota), warn once.
       console.warn("Save failed", e);
       toast("Save failed (storage blocked?)");
       return false;
@@ -223,7 +195,7 @@
         voiceLang: "en-CA"
       },
       stressEvents: [],
-      notes: [],
+      notes: [],            // now supports: {id, createdAt, text, photoId?, audioId?}
       dailyReviews: [],
       actionLibrary: [
         "paced breathing",
@@ -249,15 +221,7 @@
     return out;
   }
 
-  // Load state (and migrate from older keys if needed)
-  const loaded = loadAny();
-  let STATE = migrateState(loaded ? loaded.data : null);
-  if(loaded && loaded.key !== LS_KEY){
-    // save migrated data into the new key so it’s stable going forward
-    save(STATE);
-    // optional: tell you once
-    // toast("Imported previous data");
-  }
+  let STATE = migrateState(load());
 
   function getSpeechRecognition(){ return window.SpeechRecognition || window.webkitSpeechRecognition || null; }
 
@@ -362,6 +326,76 @@
     return xs.filter(v=>v===true).length / xs.length;
   }
 
+  // ------------------- IndexedDB for attachments (photo/audio) -------------------
+  const DB_NAME = "stress_loop_db";
+  const DB_VERSION = 1;
+  const STORE = "blobs";
+
+  function idbOpen(){
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, DB_VERSION);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if(!db.objectStoreNames.contains(STORE)){
+          db.createObjectStore(STORE, { keyPath: "id" });
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async function idbPutBlob(id, blob, mime){
+    const db = await idbOpen();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, "readwrite");
+      tx.objectStore(STORE).put({ id, blob, mime: mime || blob.type || "application/octet-stream", at: iso(new Date()) });
+      tx.oncomplete = () => { db.close(); resolve(true); };
+      tx.onerror = () => { db.close(); reject(tx.error); };
+    });
+  }
+
+  async function idbGetBlob(id){
+    const db = await idbOpen();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, "readonly");
+      const req = tx.objectStore(STORE).get(id);
+      req.onsuccess = () => { const v = req.result || null; db.close(); resolve(v); };
+      req.onerror = () => { db.close(); reject(req.error); };
+    });
+  }
+
+  async function idbDelBlob(id){
+    if(!id) return;
+    const db = await idbOpen();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, "readwrite");
+      tx.objectStore(STORE).delete(id);
+      tx.oncomplete = () => { db.close(); resolve(true); };
+      tx.onerror = () => { db.close(); reject(tx.error); };
+    });
+  }
+
+  function canRecordAudio(){
+    return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
+  }
+
+  let NOTE_DRAFT = {
+    photoId: null,
+    audioId: null,
+    photoURL: null,
+    audioURL: null,
+    recording: false,
+    recorder: null,
+    recStream: null,
+  };
+
+  function draftReset(){
+    if(NOTE_DRAFT.photoURL) try{ URL.revokeObjectURL(NOTE_DRAFT.photoURL); }catch(e){}
+    if(NOTE_DRAFT.audioURL) try{ URL.revokeObjectURL(NOTE_DRAFT.audioURL); }catch(e){}
+    NOTE_DRAFT = { photoId:null, audioId:null, photoURL:null, audioURL:null, recording:false, recorder:null, recStream:null };
+  }
+
   // Daily review prompt (best-effort while open)
   let reviewPromptedDate = null;
   let reviewTimer = null;
@@ -419,9 +453,7 @@
     return renderDashboard();
   }
 
-  // --- Everything below here is your original logic (unchanged) ---
-  // (I kept your code as-is; only edits were PWA + persistence + migration + safer save.)
-
+  // ------------------- Dashboard -------------------
   function renderDashboard(){
     const quiet = inQuietHours(STATE.settings);
     const cap = STATE.settings.dailyCap;
@@ -516,6 +548,7 @@
     ).join("");
   }
 
+  // ------------------- Stress event create -------------------
   function renderStressNew(){
     const quiet = inQuietHours(STATE.settings);
     const todayN = countTodayStress();
@@ -829,26 +862,50 @@
     if(opts && opts.auto){ toast("Timer done — please evaluate"); }
   }
 
+  // ------------------- NOTES with PHOTO + AUDIO -------------------
   function renderNotes(){
     const entries = STATE.notes.slice().sort((a,b)=> new Date(b.createdAt) - new Date(a.createdAt));
     const srSupported = !!getSpeechRecognition();
+    const audioSupported = canRecordAudio();
 
-    const rows = entries.map(n =>
-      "<tr>"+
+    const rows = entries.map(n => {
+      const badges = [
+        n.photoId ? "📷" : "",
+        n.audioId ? "🎧" : ""
+      ].filter(Boolean).join(" ");
+      return "<tr>"+
         "<td>"+fmt(n.createdAt)+"</td>"+
-        "<td>"+escapeHtml(n.text || "")+"</td>"+
+        "<td>"+escapeHtml(n.text || "")+" "+(badges?("<span class=\"muted\">"+badges+"</span>"):"")+"</td>"+
         "<td>"+
-          "<button class=\"btn small\" data-share=\""+n.id+"\">Share</button>"+
+          "<button class=\"btn small\" data-view=\""+n.id+"\">View</button> "+
+          "<button class=\"btn small\" data-share=\""+n.id+"\">Share</button> "+
           "<button class=\"btn small danger\" data-del=\""+n.id+"\">Delete</button>"+
         "</td>"+
-      "</tr>"
-    ).join("");
+      "</tr>";
+    }).join("");
+
+    const draftPreview =
+      (NOTE_DRAFT.photoURL || NOTE_DRAFT.audioURL)
+        ? (
+          "<div class=\"hr\"></div>"+
+          "<h2>Draft attachments</h2>"+
+          (NOTE_DRAFT.photoURL
+            ? "<div class=\"note\">Photo:</div><img src=\""+NOTE_DRAFT.photoURL+"\" style=\"max-width:100%; border-radius:12px; border:1px solid rgba(255,255,255,.10)\" />"
+            : "")+
+          (NOTE_DRAFT.audioURL
+            ? "<div class=\"note\" style=\"margin-top:10px\">Audio:</div><audio controls src=\""+NOTE_DRAFT.audioURL+"\" style=\"width:100%\"></audio>"
+            : "")+
+          "<div class=\"row\" style=\"margin-top:10px\">"+
+            "<button class=\"btn danger\" id=\"draftClear\">Remove attachments</button>"+
+          "</div>"
+        )
+        : "";
 
     view.innerHTML =
       "<div class=\"grid cols2\">"+
         "<div class=\"card\">"+
           "<h2>Notes (any time)</h2>"+
-          "<p class=\"note\">Write a note any time. Voice dictation depends on your browser.</p>"+
+          "<p class=\"note\">Write a note any time. You can attach a photo and (if supported) record audio.</p>"+
 
           "<label>Time</label>"+
           "<input id=\"nat\" type=\"datetime-local\" />"+
@@ -859,10 +916,18 @@
           "<div class=\"row\" style=\"margin-top:10px\">"+
             "<button class=\"btn\" id=\"dictate\" "+(srSupported?"":"disabled")+">🎙️ Dictate</button>"+
             "<button class=\"btn\" id=\"stopDict\" disabled>Stop</button>"+
-            "<span class=\"pill\" id=\"dictPill\"><span class=\"dot\"></span><span id=\"dictTxt\">"+(srSupported?"Ready":"Voice not supported in this browser")+"</span></span>"+
+            "<span class=\"pill\" id=\"dictPill\"><span class=\"dot\"></span><span id=\"dictTxt\">"+(srSupported?"Ready":"Voice not supported")+"</span></span>"+
+          "</div>"+
+
+          "<div class=\"row\" style=\"margin-top:10px\">"+
+            "<button class=\"btn\" id=\"addPhoto\">📷 Add photo</button>"+
+            "<button class=\"btn\" id=\"recBtn\" "+(audioSupported?"":"disabled")+">🎙️ Record audio</button>"+
+            "<span class=\"pill\" id=\"audPill\"><span class=\"dot\"></span><span id=\"audTxt\">"+(audioSupported?"Audio ready":"Audio not supported")+"</span></span>"+
             "<div class=\"spacer\"></div>"+
             "<button class=\"btn primary\" id=\"save\">Save note</button>"+
           "</div>"+
+
+          draftPreview+
         "</div>"+
 
         "<div class=\"card\">"+
@@ -874,10 +939,12 @@
         "</div>"+
       "</div>";
 
+    // time default
     const dt = new Date();
     const dtLocal = dt.getFullYear()+"-"+pad2(dt.getMonth()+1)+"-"+pad2(dt.getDate())+"T"+pad2(dt.getHours())+":"+pad2(dt.getMinutes());
     document.getElementById("nat").value = dtLocal;
 
+    // dictation
     const ntext = document.getElementById("ntext");
     const dictateBtn = document.getElementById("dictate");
     const stopBtn = document.getElementById("stopDict");
@@ -925,21 +992,140 @@
       stopBtn.addEventListener("click", ()=>{ try{ rec && rec.stop(); }catch(e){} });
     }
 
+    // photo
+    document.getElementById("addPhoto").addEventListener("click", ()=>{
+      const inp = document.createElement("input");
+      inp.type = "file";
+      inp.accept = "image/*";
+      inp.capture = "environment";
+      inp.onchange = async () => {
+        const file = inp.files && inp.files[0] ? inp.files[0] : null;
+        if(!file) return;
+        const id = "photo-"+uid();
+        await idbPutBlob(id, file, file.type);
+        if(NOTE_DRAFT.photoURL) try{ URL.revokeObjectURL(NOTE_DRAFT.photoURL); }catch(e){}
+        NOTE_DRAFT.photoId = id;
+        NOTE_DRAFT.photoURL = URL.createObjectURL(file);
+        toast("Photo attached");
+        render();
+      };
+      inp.click();
+    });
+
+    // audio
+    const audTxt = document.getElementById("audTxt");
+    const audPill = document.getElementById("audPill");
+    const recBtn = document.getElementById("recBtn");
+
+    function setAudStatus(kind){
+      if(kind === "recording"){
+        audTxt.textContent = "Recording…";
+        audPill.className = "pill warn";
+        recBtn.textContent = "⏹ Stop recording";
+      }else if(kind === "saved"){
+        audTxt.textContent = "Audio attached";
+        audPill.className = "pill good";
+        recBtn.textContent = "🎙️ Record audio";
+      }else{
+        audTxt.textContent = audioSupported ? "Audio ready" : "Audio not supported";
+        audPill.className = audioSupported ? "pill" : "pill bad";
+        recBtn.textContent = "🎙️ Record audio";
+      }
+    }
+
+    if(audioSupported){
+      setAudStatus(NOTE_DRAFT.recording ? "recording" : "ready");
+      recBtn.addEventListener("click", async ()=>{
+        if(NOTE_DRAFT.recording){
+          try{ NOTE_DRAFT.recorder && NOTE_DRAFT.recorder.stop(); }catch(e){}
+          return;
+        }
+        try{
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          const chunks = [];
+          const mr = new MediaRecorder(stream);
+
+          NOTE_DRAFT.recording = true;
+          NOTE_DRAFT.recorder = mr;
+          NOTE_DRAFT.recStream = stream;
+          setAudStatus("recording");
+
+          mr.ondataavailable = (ev)=>{ if(ev.data && ev.data.size) chunks.push(ev.data); };
+
+          mr.onstop = async ()=>{
+            NOTE_DRAFT.recording = false;
+            try{ stream.getTracks().forEach(t => t.stop()); }catch(e){}
+
+            const blob = new Blob(chunks, { type: mr.mimeType || "audio/webm" });
+            const id = "audio-"+uid();
+            await idbPutBlob(id, blob, blob.type);
+
+            if(NOTE_DRAFT.audioURL) try{ URL.revokeObjectURL(NOTE_DRAFT.audioURL); }catch(e){}
+            NOTE_DRAFT.audioId = id;
+            NOTE_DRAFT.audioURL = URL.createObjectURL(blob);
+
+            setAudStatus("saved");
+            toast("Audio attached");
+            render();
+          };
+
+          mr.start();
+        }catch(e){
+          console.warn(e);
+          toast("Mic permission blocked");
+          setAudStatus("ready");
+        }
+      });
+    }
+
+    // clear attachments
+    const dc = document.getElementById("draftClear");
+    if(dc){
+      dc.addEventListener("click", async ()=>{
+        await idbDelBlob(NOTE_DRAFT.photoId);
+        await idbDelBlob(NOTE_DRAFT.audioId);
+        draftReset();
+        toast("Removed");
+        render();
+      });
+    }
+
+    // save note
     document.getElementById("save").addEventListener("click", ()=>{
       const at = document.getElementById("nat").value;
       const d = at ? new Date(at) : new Date();
       const text = ntext.value.trim();
-      if(!text){ toast("Nothing to save"); return; }
-      STATE.notes.push({ id: uid(), createdAt: iso(d), text });
+
+      if(!text && !NOTE_DRAFT.photoId && !NOTE_DRAFT.audioId){
+        toast("Nothing to save");
+        return;
+      }
+
+      STATE.notes.push({
+        id: uid(),
+        createdAt: iso(d),
+        text,
+        photoId: NOTE_DRAFT.photoId || null,
+        audioId: NOTE_DRAFT.audioId || null
+      });
+
       save(STATE);
+      draftReset();
       toast("Saved");
       render();
     });
 
+    // delete note
     view.querySelectorAll("[data-del]").forEach(btn => {
-      btn.addEventListener("click", ()=>{
+      btn.addEventListener("click", async ()=>{
         const id = btn.getAttribute("data-del");
+        const n = STATE.notes.find(x => x.id === id);
+        if(!n) return;
         if(!confirm("Delete this note?")) return;
+
+        await idbDelBlob(n.photoId);
+        await idbDelBlob(n.audioId);
+
         STATE.notes = STATE.notes.filter(x => x.id !== id);
         save(STATE);
         toast("Deleted");
@@ -947,13 +1133,14 @@
       });
     });
 
+    // share text
     view.querySelectorAll("[data-share]").forEach(btn => {
       btn.addEventListener("click", async ()=>{
         const id = btn.getAttribute("data-share");
         const n = STATE.notes.find(x => x.id === id);
         if(!n) return;
 
-        const payload = fmt(n.createdAt) + NL + NL + n.text;
+        const payload = fmt(n.createdAt) + NL + NL + (n.text || "");
 
         if(navigator.share){
           try{ await navigator.share({ text: payload, title: "Note" }); toast("Shared"); }
@@ -966,8 +1153,66 @@
         }
       });
     });
+
+    // view attachments
+    view.querySelectorAll("[data-view]").forEach(btn => {
+      btn.addEventListener("click", async ()=>{
+        const id = btn.getAttribute("data-view");
+        const n = STATE.notes.find(x => x.id === id);
+        if(!n) return;
+
+        const modal = document.createElement("div");
+        modal.className = "overlay";
+
+        modal.innerHTML =
+          "<div class=\"card\" style=\"max-width:760px; width:100%\">"+
+            "<div class=\"row\">"+
+              "<h2 style=\"margin:0\">Note</h2>"+
+              "<div class=\"spacer\"></div>"+
+              "<button class=\"btn\" id=\"close\">Close</button>"+
+            "</div>"+
+            "<p class=\"note\">"+escapeHtml(fmt(n.createdAt))+"</p>"+
+            "<p>"+escapeHtml(n.text || "")+"</p>"+
+            "<div class=\"hr\"></div>"+
+            "<div id=\"attach\"></div>"+
+          "</div>";
+
+        document.body.appendChild(modal);
+        modal.querySelector("#close").addEventListener("click", ()=> modal.remove());
+
+        const attach = modal.querySelector("#attach");
+        let any = false;
+
+        if(n.photoId){
+          try{
+            const rec = await idbGetBlob(n.photoId);
+            if(rec && rec.blob){
+              const url = URL.createObjectURL(rec.blob);
+              attach.innerHTML += "<div class=\"note\">Photo:</div><img src=\""+url+"\" style=\"max-width:100%; border-radius:12px; border:1px solid rgba(255,255,255,.10)\" />";
+              any = true;
+            }
+          }catch(e){}
+        }
+
+        if(n.audioId){
+          try{
+            const rec = await idbGetBlob(n.audioId);
+            if(rec && rec.blob){
+              const url = URL.createObjectURL(rec.blob);
+              attach.innerHTML += "<div class=\"note\" style=\"margin-top:10px\">Audio:</div><audio controls src=\""+url+"\" style=\"width:100%\"></audio>";
+              any = true;
+            }
+          }catch(e){}
+        }
+
+        if(!any){
+          attach.innerHTML = "<p class=\"muted\">No attachments saved.</p>";
+        }
+      });
+    });
   }
 
+  // ------------------- Daily check-in modal -------------------
   function openDailyReviewModal(){
     const today = dateKey();
     const existing = STATE.dailyReviews.find(r => r.date === today) || null;
@@ -1042,26 +1287,22 @@
     });
   }
 
+  // ------------------- Settings -------------------
   function renderSettings(){
     const s = STATE.settings;
 
     view.innerHTML =
       "<div class=\"card\">"+
         "<h2>Settings</h2>"+
-
         "<div class=\"grid\" style=\"grid-template-columns:1fr; gap:0\">"+
           "<label>Daily cap (max stress events/day)</label>"+
           "<input id=\"cap\" type=\"number\" min=\"0\" max=\"30\" value=\""+s.dailyCap+"\" />"+
-
           "<label>Quiet hours start</label>"+
           "<input id=\"qs\" type=\"time\" value=\""+s.quietStart+"\" />"+
-
           "<label>Quiet hours end</label>"+
           "<input id=\"qe\" type=\"time\" value=\""+s.quietEnd+"\" />"+
-
           "<label>Stress timer minutes</label>"+
           "<input id=\"tm\" type=\"number\" min=\"1\" max=\"30\" value=\""+s.stressTimerMin+"\" />"+
-
           "<label>Daily check-in reminder</label>"+
           "<div class=\"row\">"+
             "<select id=\"dre\">"+
@@ -1070,11 +1311,9 @@
             "</select>"+
             "<input id=\"drt\" type=\"time\" value=\""+s.dailyReviewTime+"\" />"+
           "</div>"+
-
           "<label>Voice dictation language (if supported)</label>"+
           "<input id=\"lang\" type=\"text\" value=\""+escapeHtml(s.voiceLang)+"\" placeholder=\"en-CA\" />"+
         "</div>"+
-
         "<div class=\"hr\"></div>"+
         "<div class=\"row\">"+
           "<button class=\"btn primary\" id=\"save\">Save settings</button>"+
@@ -1104,8 +1343,21 @@
       render();
     });
 
-    document.getElementById("reset").addEventListener("click", ()=>{
+    document.getElementById("reset").addEventListener("click", async ()=>{
       if(!confirm("This will delete ALL stress events, notes, reviews, and settings. Continue?")) return;
+
+      // also wipe all attachment blobs
+      try{
+        const db = await idbOpen();
+        await new Promise((resolve, reject)=>{
+          const tx = db.transaction(STORE, "readwrite");
+          tx.objectStore(STORE).clear();
+          tx.oncomplete = () => { db.close(); resolve(true); };
+          tx.onerror = () => { db.close(); reject(tx.error); };
+        });
+      }catch(e){}
+
+      draftReset();
       STATE = defaultState();
       save(STATE);
       toast("Reset");
@@ -1113,6 +1365,7 @@
     });
   }
 
+  // ------------------- Export -------------------
   function renderExport(){
     view.innerHTML =
       "<div class=\"grid cols2\">"+
@@ -1126,7 +1379,6 @@
             "<div class=\"spacer\"></div>"+
             "<button class=\"btn\" id=\"back\">Back</button>"+
           "</div>"+
-
           "<div class=\"hr\"></div>"+
           "<h2>Copy/paste JSON backup</h2>"+
           "<textarea id=\"blob\" class=\"mono\" style=\"min-height:220px\"></textarea>"+
@@ -1134,10 +1386,9 @@
             "<button class=\"btn\" id=\"copy\">Copy</button>"+
           "</div>"+
         "</div>"+
-
         "<div class=\"card\">"+
-          "<h2>Reminder note</h2>"+
-          "<p class=\"note\">Phone browsers do not reliably run scheduled tasks in the background. Daily check-in reminder shows when the app is open after your set time.</p>"+
+          "<h2>Note</h2>"+
+          "<p class=\"note\">Attachments (photos/audio) are stored locally in your browser (IndexedDB) and are not included in CSV export. JSON export includes note IDs, not the blob files.</p>"+
         "</div>"+
       "</div>";
 
@@ -1222,9 +1473,11 @@
   }
 
   function toNotesCSV(notes){
-    const cols = ["id","createdAt","text"];
+    const cols = ["id","createdAt","text","photoId","audioId"];
     const lines = [cols.join(",")];
-    for(const n of notes){ lines.push([n.id, n.createdAt, n.text].map(escCSV).join(",")); }
+    for(const n of notes){
+      lines.push([n.id, n.createdAt, n.text, n.photoId || "", n.audioId || ""].map(escCSV).join(","));
+    }
     return lines.join(NL);
   }
 
