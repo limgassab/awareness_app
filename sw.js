@@ -1,6 +1,5 @@
-// If you ever change the app and it doesn’t update on your phone,
-// bump this version: v1 -> v2 -> v3
-const CACHE_NAME = 'stress-loop-cache-v1';
+// Bump this when you want to force-update cached app files
+const CACHE_NAME = 'stress-loop-cache-v2';
 
 const ASSETS = [
   './',
@@ -26,8 +25,8 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Network-first for HTML navigations (so updates come through),
-// cache-first for everything else.
+// Network-first for navigations (so you get updates),
+// cache-first for other assets.
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   const isNav =
