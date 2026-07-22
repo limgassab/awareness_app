@@ -1,0 +1,1561 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="description" content="A private bilingual app for daily intentions, meaningful moments, personal growth, and reflection." />
+  <title>Inner Path · Chemin intérieur</title>
+
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <meta name="theme-color" content="#2f6b57" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Inner Path" />
+  <link rel="apple-touch-icon" href="./icon-192.png" />
+  <link rel="icon" href="./icon-192.png" />
+
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f7f3;
+      --surface: #ffffff;
+      --surface-2: #eef3ef;
+      --text: #1e2924;
+      --muted: #68756e;
+      --line: #dce5df;
+      --primary: #2f6b57;
+      --primary-strong: #245443;
+      --primary-soft: #e4efe9;
+      --morning: #c99a45;
+      --morning-soft: #f7eed7;
+      --moment: #4f8069;
+      --moment-soft: #e5f0e9;
+      --difficult: #c96e56;
+      --difficult-soft: #f8e5df;
+      --evening: #687aa5;
+      --evening-soft: #e8ecf5;
+      --danger: #b95656;
+      --danger-soft: #f8e7e7;
+      --shadow: 0 14px 36px rgba(37, 73, 58, 0.10);
+      --radius: 22px;
+    }
+
+    html[data-theme="dark"] {
+      color-scheme: dark;
+      --bg: #101713;
+      --surface: #18211d;
+      --surface-2: #202c26;
+      --text: #f0f5f2;
+      --muted: #aab7b0;
+      --line: #304139;
+      --primary: #76b79a;
+      --primary-strong: #91c8ae;
+      --primary-soft: #23352c;
+      --morning: #e0b765;
+      --morning-soft: #342c1e;
+      --moment: #87b9a0;
+      --moment-soft: #24372d;
+      --difficult: #e1957f;
+      --difficult-soft: #3a2924;
+      --evening: #9aa8cf;
+      --evening-soft: #292e40;
+      --danger: #e38b8b;
+      --danger-soft: #3b2424;
+      --shadow: 0 18px 44px rgba(0, 0, 0, 0.28);
+    }
+
+    * { box-sizing: border-box; }
+    html { min-height: 100%; background: var(--bg); }
+    body {
+      margin: 0;
+      min-height: 100%;
+      background:
+        radial-gradient(circle at top right, color-mix(in srgb, var(--primary-soft) 72%, transparent), transparent 42%),
+        var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.5;
+    }
+
+    button, input, textarea, select { font: inherit; }
+    button { -webkit-tap-highlight-color: transparent; }
+    a { color: var(--primary); }
+
+    .app-shell { min-height: 100vh; padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      background: color-mix(in srgb, var(--bg) 88%, transparent);
+      backdrop-filter: blur(18px);
+      border-bottom: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
+    }
+    .topbar-inner {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: calc(12px + env(safe-area-inset-top)) 18px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .brand-block { min-width: 0; }
+    .brand { font-weight: 830; font-size: 1.04rem; letter-spacing: -0.02em; }
+    .brand-sub { color: var(--muted); font-size: 0.76rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .top-actions { display: flex; gap: 8px; align-items: center; }
+
+    .lang-switch {
+      display: inline-flex;
+      padding: 3px;
+      border-radius: 999px;
+      background: var(--surface-2);
+      border: 1px solid var(--line);
+    }
+    .lang-switch button {
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      min-width: 42px;
+      padding: 7px 10px;
+      border-radius: 999px;
+      font-weight: 750;
+      cursor: pointer;
+    }
+    .lang-switch button.active { background: var(--surface); color: var(--primary); box-shadow: 0 3px 10px rgba(0,0,0,.07); }
+
+    .icon-button {
+      width: 42px;
+      height: 42px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+    }
+
+    main { max-width: 980px; margin: 0 auto; padding: 24px 16px 38px; }
+    .page { animation: pageIn .22s ease both; }
+    @keyframes pageIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      border-radius: 28px;
+      min-height: 180px;
+      padding: 25px;
+      color: white;
+      background:
+        linear-gradient(105deg, rgba(24,62,49,.92), rgba(47,107,87,.70)),
+        url('./icon-512.png') center 44% / cover no-repeat;
+      box-shadow: var(--shadow);
+      display: flex;
+      align-items: flex-end;
+    }
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to top, rgba(11,31,24,.38), transparent 62%);
+      pointer-events: none;
+    }
+    .hero-content { position: relative; z-index: 1; max-width: 680px; }
+    .eyebrow { margin: 0 0 5px; font-size: .82rem; font-weight: 750; opacity: .86; }
+    h1 { margin: 0; font-size: clamp(1.75rem, 6vw, 2.6rem); line-height: 1.1; letter-spacing: -0.045em; }
+    .hero p { margin: 10px 0 0; max-width: 600px; color: rgba(255,255,255,.88); }
+
+    .section { margin-top: 18px; }
+    .section-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin: 0 2px 10px; }
+    .section-heading h2 { margin: 0; font-size: 1.06rem; letter-spacing: -0.02em; }
+    .section-heading p { margin: 2px 0 0; color: var(--muted); font-size: .85rem; }
+
+    .grid { display: grid; gap: 14px; }
+    .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    @media (max-width: 720px) { .grid.two, .grid.three { grid-template-columns: 1fr; } }
+
+    .card {
+      border: 1px solid var(--line);
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 18px;
+      box-shadow: var(--shadow);
+    }
+    .card.flat { box-shadow: none; }
+    .card.morning { background: linear-gradient(145deg, var(--morning-soft), var(--surface)); border-color: color-mix(in srgb, var(--morning) 28%, var(--line)); }
+    .card.moment { background: linear-gradient(145deg, var(--moment-soft), var(--surface)); border-color: color-mix(in srgb, var(--moment) 28%, var(--line)); }
+    .card.evening { background: linear-gradient(145deg, var(--evening-soft), var(--surface)); border-color: color-mix(in srgb, var(--evening) 28%, var(--line)); }
+    .card.difficult { background: linear-gradient(145deg, var(--difficult-soft), var(--surface)); border-color: color-mix(in srgb, var(--difficult) 28%, var(--line)); }
+    .card-title { display: flex; align-items: flex-start; gap: 12px; }
+    .card-title h2, .card-title h3 { margin: 0; letter-spacing: -0.025em; }
+    .card-title p { margin: 4px 0 0; color: var(--muted); font-size: .88rem; }
+    .card-icon { flex: 0 0 auto; width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center; font-size: 1.2rem; background: color-mix(in srgb, var(--surface) 70%, transparent); border: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
+
+    .intention-text { font-size: 1.18rem; line-height: 1.45; margin: 16px 0 4px; font-weight: 720; }
+    .small-action { color: var(--muted); margin: 8px 0 0; }
+    .theme-chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 6px 10px; background: color-mix(in srgb, var(--morning-soft) 76%, var(--surface)); border: 1px solid color-mix(in srgb, var(--morning) 35%, var(--line)); font-size: .78rem; font-weight: 750; }
+
+    .button-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+    .button-row.end { justify-content: flex-end; }
+    .spacer { flex: 1; }
+    .btn {
+      border: 1px solid var(--line);
+      border-radius: 15px;
+      padding: 11px 15px;
+      background: var(--surface);
+      color: var(--text);
+      font-weight: 760;
+      cursor: pointer;
+      transition: transform .12s ease, border-color .12s ease, background .12s ease;
+    }
+    .btn:hover { border-color: color-mix(in srgb, var(--primary) 52%, var(--line)); }
+    .btn:active { transform: translateY(1px) scale(.99); }
+    .btn.primary { background: var(--primary); color: white; border-color: var(--primary); }
+    .btn.primary:hover { background: var(--primary-strong); }
+    .btn.soft { background: var(--primary-soft); color: var(--primary-strong); border-color: color-mix(in srgb, var(--primary) 24%, var(--line)); }
+    .btn.danger { background: var(--danger-soft); color: var(--danger); border-color: color-mix(in srgb, var(--danger) 35%, var(--line)); }
+    .btn.small { padding: 8px 11px; border-radius: 12px; font-size: .82rem; }
+    .btn.wide { width: 100%; }
+    .btn:disabled { opacity: .52; cursor: not-allowed; }
+
+    .quick-card { min-height: 138px; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; }
+    .quick-card .arrow { align-self: flex-end; font-size: 1.2rem; color: var(--muted); }
+
+    .status-line { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: .84rem; margin-top: 13px; }
+    .status-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+    .status-dot.done { background: var(--primary); }
+
+    label { display: block; margin: 16px 0 7px; font-size: .85rem; font-weight: 760; color: var(--text); }
+    .optional { color: var(--muted); font-weight: 560; }
+    input, textarea, select {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 15px;
+      background: var(--surface);
+      color: var(--text);
+      padding: 12px 13px;
+      outline: none;
+    }
+    textarea { min-height: 118px; resize: vertical; }
+    input:focus, textarea:focus, select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 14%, transparent); }
+    input[type="range"] { padding: 0; accent-color: var(--primary); }
+
+    .choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 9px; }
+    .choice-grid.three { grid-template-columns: repeat(3, minmax(0,1fr)); }
+    @media (max-width: 520px) { .choice-grid.three { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+    .choice {
+      display: block;
+      cursor: pointer;
+    }
+    .choice input { position: absolute; opacity: 0; pointer-events: none; }
+    .choice span {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 48px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 15px;
+      background: var(--surface);
+      font-size: .88rem;
+      font-weight: 680;
+      transition: .14s ease;
+    }
+    .choice input:checked + span { background: var(--primary-soft); border-color: var(--primary); color: var(--primary-strong); }
+
+    .form-help { margin: 7px 0 0; color: var(--muted); font-size: .78rem; }
+    .preview { display: grid; gap: 10px; margin-top: 12px; }
+    .preview img { max-width: 100%; max-height: 310px; object-fit: cover; border-radius: 18px; border: 1px solid var(--line); }
+    .preview audio { width: 100%; }
+    .hidden { display: none !important; }
+
+    .timeline { display: grid; gap: 12px; }
+    .entry-card { border: 1px solid var(--line); background: var(--surface); border-radius: 19px; padding: 16px; box-shadow: 0 8px 22px rgba(37,73,58,.06); }
+    .entry-top { display: flex; gap: 10px; align-items: flex-start; }
+    .entry-icon { width: 38px; height: 38px; border-radius: 13px; display: grid; place-items: center; background: var(--surface-2); flex: 0 0 auto; }
+    .entry-main { min-width: 0; flex: 1; }
+    .entry-title { font-weight: 780; }
+    .entry-time { color: var(--muted); font-size: .76rem; }
+    .entry-text { margin: 10px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .entry-meta { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 10px; }
+    .tag { display: inline-flex; border: 1px solid var(--line); background: var(--surface-2); border-radius: 999px; padding: 5px 9px; font-size: .73rem; color: var(--muted); }
+
+    .stats { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; }
+    .stat { border: 1px solid var(--line); border-radius: 17px; padding: 14px; background: var(--surface); }
+    .stat-value { font-size: 1.55rem; font-weight: 850; line-height: 1; }
+    .stat-label { margin-top: 7px; color: var(--muted); font-size: .76rem; }
+    @media (max-width: 520px) { .stats { grid-template-columns: 1fr; } }
+
+    .empty { text-align: center; padding: 32px 18px; color: var(--muted); }
+    .empty .emoji { display: block; font-size: 2rem; margin-bottom: 9px; }
+
+    .bottom-nav {
+      position: fixed;
+      z-index: 40;
+      left: 50%;
+      bottom: calc(10px + env(safe-area-inset-bottom));
+      transform: translateX(-50%);
+      width: min(94%, 620px);
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 4px;
+      padding: 7px;
+      border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+      border-radius: 24px;
+      background: color-mix(in srgb, var(--surface) 92%, transparent);
+      backdrop-filter: blur(20px);
+      box-shadow: 0 18px 45px rgba(20, 45, 35, .18);
+    }
+    .nav-button {
+      min-width: 0;
+      border: 0;
+      border-radius: 17px;
+      background: transparent;
+      color: var(--muted);
+      padding: 8px 3px 7px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      align-items: center;
+      cursor: pointer;
+      font-size: .67rem;
+      font-weight: 720;
+    }
+    .nav-button .nav-icon { font-size: 1.12rem; line-height: 1.1; }
+    .nav-button.active { color: var(--primary); background: var(--primary-soft); }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: rgba(7,20,15,.58);
+      backdrop-filter: blur(4px);
+      padding: 16px;
+      display: grid;
+      place-items: center;
+    }
+    .modal {
+      width: min(100%, 650px);
+      max-height: min(88vh, 760px);
+      overflow: auto;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 25px;
+      padding: 19px;
+      box-shadow: 0 28px 70px rgba(0,0,0,.28);
+    }
+    .modal-head { display: flex; gap: 12px; align-items: flex-start; }
+    .modal-head h2 { margin: 0; letter-spacing: -0.03em; }
+    .modal-head p { margin: 4px 0 0; color: var(--muted); font-size: .86rem; }
+    .close-button { margin-left: auto; flex: 0 0 auto; }
+
+    .toast {
+      position: fixed;
+      z-index: 200;
+      left: 50%;
+      bottom: calc(92px + env(safe-area-inset-bottom));
+      transform: translate(-50%, 18px);
+      opacity: 0;
+      pointer-events: none;
+      padding: 11px 14px;
+      border-radius: 15px;
+      background: color-mix(in srgb, var(--text) 92%, transparent);
+      color: var(--bg);
+      box-shadow: 0 12px 30px rgba(0,0,0,.25);
+      transition: .2s ease;
+      max-width: 90%;
+      text-align: center;
+      font-weight: 680;
+      font-size: .84rem;
+    }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+    .settings-list { display: grid; gap: 14px; }
+    .setting-row { display: grid; grid-template-columns: minmax(0,1fr) minmax(170px, .75fr); gap: 16px; align-items: center; padding: 13px 0; border-bottom: 1px solid var(--line); }
+    .setting-row:last-child { border-bottom: 0; }
+    .setting-row h3 { margin: 0; font-size: .92rem; }
+    .setting-row p { margin: 3px 0 0; color: var(--muted); font-size: .78rem; }
+    @media (max-width: 620px) { .setting-row { grid-template-columns: 1fr; gap: 8px; } }
+
+    .divider { height: 1px; background: var(--line); margin: 18px 0; }
+    .privacy-note { color: var(--muted); font-size: .8rem; }
+    .version { text-align: center; margin-top: 28px; color: var(--muted); font-size: .72rem; }
+    .optional-details { margin-top: 18px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface-2); overflow: hidden; }
+    .optional-details summary { cursor: pointer; padding: 13px 15px; font-weight: 760; color: var(--primary-strong); list-style-position: inside; }
+    .optional-details-body { padding: 0 15px 15px; }
+    .difficult-note { margin-top: 16px; padding: 13px 15px; border-radius: 15px; background: var(--difficult-soft); border: 1px solid color-mix(in srgb, var(--difficult) 32%, var(--line)); }
+    .record-nav .nav-icon { font-size: 1.35rem; }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="brand-block">
+          <div class="brand" id="brandName">Inner Path</div>
+          <div class="brand-sub" id="brandSub">Intention · Moments · Growth</div>
+        </div>
+        <div class="top-actions">
+          <div class="lang-switch" aria-label="Language">
+            <button id="langEn" type="button">EN</button>
+            <button id="langFr" type="button">FR</button>
+          </div>
+          <button class="icon-button" id="themeQuick" type="button" aria-label="Theme">◐</button>
+        </div>
+      </div>
+    </header>
+
+    <main id="view"></main>
+
+    <nav class="bottom-nav" id="bottomNav" aria-label="Main navigation">
+      <button class="nav-button" data-route="today"><span class="nav-icon">⌂</span><span data-i18n="nav.today">Today</span></button>
+      <button class="nav-button record-nav" data-route="record"><span class="nav-icon">＋</span><span data-i18n="nav.record">Record</span></button>
+      <button class="nav-button" data-route="journey"><span class="nav-icon">⌁</span><span data-i18n="nav.journey">Journey</span></button>
+      <button class="nav-button" data-route="settings"><span class="nav-icon">⚙</span><span data-i18n="nav.settings">Settings</span></button>
+    </nav>
+
+    <div class="toast" id="toast"></div>
+  </div>
+
+<script>
+(() => {
+  "use strict";
+
+  const APP_VERSION = "1.1.0";
+  const STATE_KEY = "inner_path_app_v1";
+  const LEGACY_KEYS = ["stress_loop_app_v4", "stress_loop_app_v3", "stress_loop_app_v2", "stress_loop_app"];
+  const DB_NAME = "stress_loop_db"; // Kept to preserve existing photo/audio attachments.
+  const DB_VERSION = 1;
+  const BLOB_STORE = "blobs";
+
+  const I18N = {
+    en: {
+      appName: "Inner Path",
+      appSubtitle: "Intention · Moments · Growth",
+      nav: { today: "Today", record: "Record", journey: "Journey", settings: "Settings" },
+      common: {
+        save: "Save", cancel: "Cancel", edit: "Edit", delete: "Delete", close: "Close", later: "Later",
+        optional: "optional", other: "Other", addPhoto: "Add photo", recordAudio: "Record audio",
+        stopRecording: "Stop recording", remove: "Remove", view: "View", yes: "Yes", no: "No",
+        done: "Done", notDone: "Not completed", today: "Today", yesterday: "Yesterday", continue: "Continue",
+        saved: "Saved", deleted: "Deleted", copied: "Copied", export: "Export", import: "Import"
+      },
+      today: {
+        morning: "Good morning", afternoon: "Good afternoon", evening: "Good evening",
+        intro: "A quiet place to choose your direction, notice life, and keep a record of your growth.",
+        intentionTitle: "Today's intention", intentionEmpty: "Choose what you would like to work on or remember today.",
+        setIntention: "Set today's intention", editIntention: "Edit intention", smallAction: "Small action",
+        recordTitle: "Record a moment", recordText: "Good, difficult, ordinary, or meaningful — keep what matters.",
+        recordButton: "Record a moment", eveningTitle: "Evening reflection", eveningEmpty: "At the end of the day, reflect briefly on how your intention went.",
+        reflectButton: "Reflect on today", reflectionDone: "Today's reflection is complete.",
+        recentTitle: "Recent moments", noRecent: "No moments recorded yet."
+      },
+      intention: {
+        title: "What would you like to work on today?", subtitle: "Choose a theme or write anything meaningful to you.",
+        themeLabel: "Theme", textLabel: "Your intention", textPlaceholder: "For example: I want to listen more carefully and be patient with myself.",
+        actionLabel: "A small action I can take", actionPlaceholder: "For example: Thank one person sincerely.",
+        freeFormHelp: "Your intention can be about work, relationships, character, rest, learning, or anything else.",
+        themes: {
+          gratitude: "Thankfulness", humility: "Humility", helping: "Helping others", kindness: "Kindness",
+          patience: "Patience", courage: "Courage", calm: "Calm", focus: "Focus", listening: "Listening",
+          discipline: "Self-discipline", forgiveness: "Forgiveness", other: "My own intention"
+        },
+        required: "Please write your intention or choose a theme."
+      },
+      moment: {
+        title: "Record a moment", subtitle: "Write freely. One sentence, a photo, or a short recording is enough.",
+        optionalDetails: "Add a category or feeling (optional)", typeLabel: "What kind of moment was it?", feelingLabel: "How did it feel?", feelingOptional: "You can skip this.",
+        whatLabel: "What happened?", whatPlaceholder: "Write anything you would like to remember.",
+        types: { good: "A good moment", difficult: "A difficult moment", growth: "A moment of growth", remember: "Something to remember", other: "Another moment" },
+        feelings: { joy: "Joy", gratitude: "Gratitude", calm: "Calm", pride: "Pride", connection: "Connection", fear: "Fear", stress: "Stress", sadness: "Sadness", anger: "Anger", other: "Other" },
+        attachmentHelp: "Photos and recordings stay only on this device.",
+        audioReady: "Audio ready", audioRecording: "Recording…", audioAttached: "Audio attached", audioUnsupported: "Audio recording is not supported in this browser.",
+        micBlocked: "Microphone permission was blocked.", photoAttached: "Photo attached", photoFailed: "The photo could not be saved.",
+        nothing: "Add a short note, photo, or audio recording before saving.",
+        difficultPrompt: "Would a short pause help after you save this difficult moment?", startReset: "Save and take a pause", saveOnly: "Save moment"
+      },
+      reset: {
+        title: "A short pause", choose: "Choose one simple action", actions: {
+          breathe: "Breathe slowly", walk: "Take a short walk", pause: "Pause quietly", write: "Write what I need",
+          reflect: "Reflect", talk: "Talk to someone", own: "My own action"
+        },
+        ownLabel: "Your action", ownPlaceholder: "What will you do?", start: "Start the pause",
+        running: "Stay with your chosen action.", finishEarly: "Finish now", evaluate: "How do you feel now?",
+        resultLabel: "Compared with before", results: { better: "Better", same: "About the same", harder: "More difficult" },
+        note: "Anything you want to remember?", complete: "Save pause", improvement: "After the pause", better: "Better", same: "About the same", harder: "More difficult"
+      },
+      reflection: {
+        title: "How did it go today?", subtitle: "Your intention this morning was:", noIntention: "You did not set an intention this morning. You can still reflect on your day.",
+        alignmentLabel: "How did it go?", alignment: { well: "I practised it well", little: "A little", difficult: "It was difficult", forgot: "I did not think about it" },
+        rememberLabel: "What would you like to remember from today?", rememberPlaceholder: "One sentence is enough.",
+        continueLabel: "Continue with this intention tomorrow", saved: "Evening reflection saved."
+      },
+      moments: {
+        title: "Moments", subtitle: "A private record of what you noticed, experienced, and learned.",
+        all: "All", good: "Good", difficult: "Difficult", growth: "Growth", remember: "Remember",
+        empty: "No moments match this view.", attachments: "Attachments", photo: "Photo", audio: "Audio",
+        confirmDelete: "Delete this moment?", legacyStress: "Earlier difficult moment", supportResult: "Short pause"
+      },
+      journey: {
+        title: "Your journey", subtitle: "Gentle observations — not a score and not a judgement.",
+        intentions: "Days with an intention", moments: "Moments recorded", reflections: "Evening reflections",
+        themeTitle: "Themes you have worked on", noTheme: "Choose a morning intention to begin seeing themes here.",
+        timelineTitle: "Recent days", noData: "Your journey will appear here as you use the app.",
+        workedOn: "Worked on", reflected: "Evening reflection", recorded: "moment(s) recorded"
+      },
+      settings: {
+        title: "Settings", subtitle: "Language, appearance, reminders, privacy, and your data.",
+        language: "Language", languageHelp: "Your own entries are never translated or changed.",
+        appearance: "Appearance", appearanceHelp: "Choose light, dark, or follow your device.",
+        themeSystem: "Follow device", themeLight: "Light", themeDark: "Dark",
+        reminders: "Daily prompts", remindersHelp: "Prompts appear when the app is open after the selected time.",
+        enabled: "Enabled", disabled: "Disabled", morningTime: "Morning intention time", eveningTime: "Evening reflection time",
+        resetMinutes: "Short pause duration", minutes: "minutes", dataTitle: "Your data", backup: "Download backup",
+        restore: "Restore backup", backupHelp: "The backup contains written records and settings. Photo and audio files remain on this device.",
+        clear: "Delete all app data", clearConfirm: "This will permanently delete all intentions, moments, reflections, settings, photos, and recordings from this device. Continue?",
+        privacyTitle: "Privacy", privacyText: "Your entries are stored locally on this device. There is no account, cloud database, advertising tracker, or server upload in this version.",
+        storageText: "Clearing browser data or uninstalling the app may remove your records. Download backups regularly.",
+        migration: "Existing entries from the earlier Stress Loop version were preserved and moved into this app.",
+        updated: "Settings saved.", invalidBackup: "This backup file could not be restored.", restored: "Backup restored.", version: "App version"
+      },
+      prompt: {
+        morningTitle: "Begin your day with an intention", morningText: "What would you like to work on, practise, or remember today?",
+        eveningTitle: "A short evening reflection", eveningText: "Take a moment to notice how your intention went today."
+      },
+      errors: { save: "The app could not save on this device.", notFound: "This entry could not be found." }
+    },
+    fr: {
+      appName: "Chemin intérieur",
+      appSubtitle: "Intention · Moments · Cheminement",
+      nav: { today: "Aujourd’hui", record: "Noter", journey: "Parcours", settings: "Réglages" },
+      common: {
+        save: "Enregistrer", cancel: "Annuler", edit: "Modifier", delete: "Supprimer", close: "Fermer", later: "Plus tard",
+        optional: "facultatif", other: "Autre", addPhoto: "Ajouter une photo", recordAudio: "Enregistrer un audio",
+        stopRecording: "Arrêter l’enregistrement", remove: "Retirer", view: "Voir", yes: "Oui", no: "Non",
+        done: "Terminé", notDone: "Non terminé", today: "Aujourd’hui", yesterday: "Hier", continue: "Continuer",
+        saved: "Enregistré", deleted: "Supprimé", copied: "Copié", export: "Exporter", import: "Importer"
+      },
+      today: {
+        morning: "Bonjour", afternoon: "Bon après-midi", evening: "Bonsoir",
+        intro: "Un espace calme pour choisir une direction, remarquer ce que vous vivez et garder une trace de votre cheminement.",
+        intentionTitle: "Intention du jour", intentionEmpty: "Choisissez ce que vous souhaitez travailler ou garder à l’esprit aujourd’hui.",
+        setIntention: "Définir mon intention", editIntention: "Modifier l’intention", smallAction: "Petite action",
+        recordTitle: "Noter un moment", recordText: "Bon, difficile, ordinaire ou important — gardez ce qui compte.",
+        recordButton: "Noter un moment", eveningTitle: "Réflexion du soir", eveningEmpty: "À la fin de la journée, prenez un court moment pour voir comment votre intention s’est vécue.",
+        reflectButton: "Réfléchir à ma journée", reflectionDone: "La réflexion du jour est terminée.",
+        recentTitle: "Moments récents", noRecent: "Aucun moment noté pour l’instant."
+      },
+      intention: {
+        title: "Sur quoi aimeriez-vous travailler aujourd’hui ?", subtitle: "Choisissez un thème ou écrivez librement ce qui compte pour vous.",
+        themeLabel: "Thème", textLabel: "Votre intention", textPlaceholder: "Par exemple : Je veux mieux écouter et être patiente avec moi-même.",
+        actionLabel: "Une petite action que je peux faire", actionPlaceholder: "Par exemple : Remercier sincèrement une personne.",
+        freeFormHelp: "Votre intention peut concerner le travail, les relations, le caractère, le repos, l’apprentissage ou tout autre aspect de votre vie.",
+        themes: {
+          gratitude: "Gratitude", humility: "Humilité", helping: "Aider les autres", kindness: "Bienveillance",
+          patience: "Patience", courage: "Courage", calm: "Calme", focus: "Concentration", listening: "Écoute",
+          discipline: "Discipline personnelle", forgiveness: "Pardon", other: "Ma propre intention"
+        },
+        required: "Écrivez votre intention ou choisissez un thème."
+      },
+      moment: {
+        title: "Noter un moment", subtitle: "Écrivez librement. Une phrase, une photo ou un court enregistrement suffit.",
+        optionalDetails: "Ajouter une catégorie ou une émotion (facultatif)", typeLabel: "Quel type de moment était-ce ?", feelingLabel: "Comment l’avez-vous vécu ?", feelingOptional: "Vous pouvez passer cette étape.",
+        whatLabel: "Que s’est-il passé ?", whatPlaceholder: "Écrivez ce que vous souhaitez garder en mémoire.",
+        types: { good: "Un bon moment", difficult: "Un moment difficile", growth: "Un moment de progression", remember: "Quelque chose à retenir", other: "Un autre moment" },
+        feelings: { joy: "Joie", gratitude: "Gratitude", calm: "Calme", pride: "Fierté", connection: "Lien", fear: "Peur", stress: "Stress", sadness: "Tristesse", anger: "Colère", other: "Autre" },
+        attachmentHelp: "Les photos et les enregistrements restent uniquement sur cet appareil.",
+        audioReady: "Audio prêt", audioRecording: "Enregistrement…", audioAttached: "Audio ajouté", audioUnsupported: "L’enregistrement audio n’est pas pris en charge par ce navigateur.",
+        micBlocked: "L’autorisation du microphone a été refusée.", photoAttached: "Photo ajoutée", photoFailed: "La photo n’a pas pu être enregistrée.",
+        nothing: "Ajoutez une courte note, une photo ou un enregistrement avant de sauvegarder.",
+        difficultPrompt: "Une courte pause pourrait-elle vous aider après avoir enregistré ce moment difficile ?", startReset: "Enregistrer et faire une pause", saveOnly: "Enregistrer le moment"
+      },
+      reset: {
+        title: "Une courte pause", choose: "Choisissez une action simple", actions: {
+          breathe: "Respirer lentement", walk: "Faire une courte marche", pause: "Faire une pause au calme", write: "Écrire ce dont j’ai besoin",
+          reflect: "Réfléchir", talk: "Parler à quelqu’un", own: "Ma propre action"
+        },
+        ownLabel: "Votre action", ownPlaceholder: "Qu’allez-vous faire ?", start: "Commencer la pause",
+        running: "Restez avec l’action que vous avez choisie.", finishEarly: "Terminer maintenant", evaluate: "Comment vous sentez-vous maintenant ?",
+        resultLabel: "Par rapport à avant", results: { better: "Mieux", same: "À peu près pareil", harder: "Plus difficile" },
+        note: "Quelque chose à retenir ?", complete: "Enregistrer la pause", improvement: "Après la pause", better: "Mieux", same: "À peu près pareil", harder: "Plus difficile"
+      },
+      reflection: {
+        title: "Comment cela s’est-il passé aujourd’hui ?", subtitle: "Votre intention de ce matin était :", noIntention: "Vous n’avez pas défini d’intention ce matin. Vous pouvez tout de même réfléchir à votre journée.",
+        alignmentLabel: "Comment cela s’est-il passé ?", alignment: { well: "Je l’ai bien mise en pratique", little: "Un peu", difficult: "Cela a été difficile", forgot: "Je n’y ai pas pensé" },
+        rememberLabel: "Que souhaitez-vous retenir de cette journée ?", rememberPlaceholder: "Une phrase suffit.",
+        continueLabel: "Continuer avec cette intention demain", saved: "Réflexion du soir enregistrée."
+      },
+      moments: {
+        title: "Moments", subtitle: "Une trace personnelle de ce que vous avez remarqué, vécu et appris.",
+        all: "Tous", good: "Bons", difficult: "Difficiles", growth: "Progression", remember: "À retenir",
+        empty: "Aucun moment ne correspond à cette vue.", attachments: "Pièces jointes", photo: "Photo", audio: "Audio",
+        confirmDelete: "Supprimer ce moment ?", legacyStress: "Moment difficile antérieur", supportResult: "Courte pause"
+      },
+      journey: {
+        title: "Votre parcours", subtitle: "Des observations bienveillantes — ni une note ni un jugement.",
+        intentions: "Jours avec une intention", moments: "Moments notés", reflections: "Réflexions du soir",
+        themeTitle: "Thèmes que vous avez travaillés", noTheme: "Choisissez une intention le matin pour commencer à voir vos thèmes ici.",
+        timelineTitle: "Jours récents", noData: "Votre parcours apparaîtra ici au fil de votre utilisation.",
+        workedOn: "Travail sur", reflected: "Réflexion du soir", recorded: "moment(s) noté(s)"
+      },
+      settings: {
+        title: "Réglages", subtitle: "Langue, apparence, rappels, confidentialité et données.",
+        language: "Langue", languageHelp: "Vos propres écrits ne sont jamais traduits ni modifiés.",
+        appearance: "Apparence", appearanceHelp: "Choisissez le mode clair, sombre ou celui de votre appareil.",
+        themeSystem: "Selon l’appareil", themeLight: "Clair", themeDark: "Sombre",
+        reminders: "Invitations quotidiennes", remindersHelp: "Les invitations apparaissent lorsque l’application est ouverte après l’heure choisie.",
+        enabled: "Activées", disabled: "Désactivées", morningTime: "Heure de l’intention du matin", eveningTime: "Heure de la réflexion du soir",
+        resetMinutes: "Durée de la courte pause", minutes: "minutes", dataTitle: "Vos données", backup: "Télécharger une sauvegarde",
+        restore: "Restaurer une sauvegarde", backupHelp: "La sauvegarde contient les écrits et les réglages. Les photos et les audios restent sur cet appareil.",
+        clear: "Supprimer toutes les données", clearConfirm: "Toutes les intentions, moments, réflexions, photos, enregistrements et réglages seront définitivement supprimés de cet appareil. Continuer ?",
+        privacyTitle: "Confidentialité", privacyText: "Vos contenus sont enregistrés localement sur cet appareil. Cette version ne contient ni compte, ni base de données en ligne, ni suivi publicitaire, ni envoi vers un serveur.",
+        storageText: "Effacer les données du navigateur ou désinstaller l’application peut supprimer vos contenus. Téléchargez régulièrement une sauvegarde.",
+        migration: "Les contenus de l’ancienne version Stress Loop ont été conservés et intégrés à cette application.",
+        updated: "Réglages enregistrés.", invalidBackup: "Ce fichier de sauvegarde n’a pas pu être restauré.", restored: "Sauvegarde restaurée.", version: "Version de l’application"
+      },
+      prompt: {
+        morningTitle: "Commencez la journée avec une intention", morningText: "Sur quoi souhaitez-vous travailler, vous exercer ou garder votre attention aujourd’hui ?",
+        eveningTitle: "Une courte réflexion du soir", eveningText: "Prenez un moment pour voir comment votre intention s’est vécue aujourd’hui."
+      },
+      errors: { save: "L’application n’a pas pu enregistrer les données sur cet appareil.", notFound: "Cette entrée est introuvable." }
+    }
+  };
+
+  const THEME_ICONS = { system: "◐", light: "☀", dark: "☾" };
+  const MOMENT_ICONS = { good: "☀", difficult: "◌", growth: "↗", remember: "✦", other: "•" };
+  const THEME_ICONS_GROWTH = { gratitude: "✦", humility: "○", helping: "♡", kindness: "❀", patience: "⌛", courage: "↑", calm: "≈", focus: "◎", listening: "◖", discipline: "◇", forgiveness: "↺", other: "✎" };
+
+  const view = document.getElementById("view");
+  const toastEl = document.getElementById("toast");
+  const langEn = document.getElementById("langEn");
+  const langFr = document.getElementById("langFr");
+  const themeQuick = document.getElementById("themeQuick");
+
+  const uid = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
+  const iso = (d = new Date()) => new Date(d).toISOString();
+  const pad2 = n => String(n).padStart(2, "0");
+  const dateKey = (d = new Date()) => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+  const localDateTimeValue = (d = new Date()) => `${dateKey(d)}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  const minutesOfDay = d => d.getHours() * 60 + d.getMinutes();
+  const parseHHMM = value => {
+    const m = /^(\d{2}):(\d{2})$/.exec(value || "");
+    if (!m) return null;
+    const h = Number(m[1]), min = Number(m[2]);
+    return h >= 0 && h <= 23 && min >= 0 && min <= 59 ? h * 60 + min : null;
+  };
+
+  function getByPath(obj, path) {
+    return path.split(".").reduce((acc, key) => acc && acc[key], obj);
+  }
+
+  function t(path) {
+    const lang = STATE?.settings?.language || "en";
+    return getByPath(I18N[lang], path) ?? getByPath(I18N.en, path) ?? path;
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function locale() { return STATE.settings.language === "fr" ? "fr-CA" : "en-CA"; }
+  function fmtDate(value, options = {}) {
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toLocaleDateString(locale(), options);
+  }
+  function fmtDateTime(value) {
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toLocaleString(locale(), { dateStyle: "medium", timeStyle: "short" });
+  }
+  function fmtTime(value) {
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" });
+  }
+
+  function toast(message) {
+    toastEl.textContent = message;
+    toastEl.classList.add("show");
+    clearTimeout(toast._timer);
+    toast._timer = setTimeout(() => toastEl.classList.remove("show"), 2200);
+  }
+
+  function safeSessionGet(key, fallback = null) {
+    try { return sessionStorage.getItem(key) ?? fallback; } catch (_) { return fallback; }
+  }
+
+  function safeSessionSet(key, value) {
+    try { sessionStorage.setItem(key, value); } catch (_) {}
+  }
+
+  function defaultState() {
+    return {
+      version: 1,
+      settings: {
+        language: "en",
+        theme: "system",
+        promptsEnabled: true,
+        morningTime: "08:00",
+        eveningTime: "20:00",
+        resetMinutes: 5,
+        migratedLegacy: false,
+        lastMorningPromptDate: null,
+        lastEveningPromptDate: null
+      },
+      intentions: [],
+      moments: [],
+      reflections: [],
+      resetActions: ["breathe", "walk", "pause", "write", "reflect", "talk", "own"]
+    };
+  }
+
+  function normalizeState(input) {
+    const base = defaultState();
+    const out = input && typeof input === "object" ? input : {};
+    out.version = 1;
+    out.settings = Object.assign({}, base.settings, out.settings || {});
+    out.intentions = Array.isArray(out.intentions) ? out.intentions : [];
+    out.moments = Array.isArray(out.moments) ? out.moments : [];
+    out.reflections = Array.isArray(out.reflections) ? out.reflections : [];
+    out.resetActions = Array.isArray(out.resetActions) ? out.resetActions : base.resetActions.slice();
+    return out;
+  }
+
+  function migrateLegacyState(legacy) {
+    const out = defaultState();
+    out.settings.migratedLegacy = true;
+    if (legacy?.settings?.voiceLang?.toLowerCase().startsWith("fr")) out.settings.language = "fr";
+    if (legacy?.settings?.dailyReviewTime) out.settings.eveningTime = legacy.settings.dailyReviewTime;
+    if (legacy?.settings?.stressTimerMin) out.settings.resetMinutes = Number(legacy.settings.stressTimerMin) || 5;
+
+    const legacyNotes = Array.isArray(legacy?.notes) ? legacy.notes : [];
+    for (const n of legacyNotes) {
+      out.moments.push({
+        id: n.id || uid(), createdAt: n.createdAt || iso(), type: "remember", feeling: "", text: n.text || "",
+        photoId: n.photoId || null, audioId: n.audioId || null, source: "legacy-note", support: null
+      });
+    }
+
+    const legacyStress = Array.isArray(legacy?.stressEvents) ? legacy.stressEvents : [];
+    for (const e of legacyStress) {
+      out.moments.push({
+        id: e.id || uid(), createdAt: e.createdAt || iso(), type: "difficult", feeling: "stress",
+        text: e?.baseline?.what || "", photoId: null, audioId: null, source: "legacy-stress",
+        context: e?.baseline?.context || "", intensity: Number.isFinite(e?.baseline?.intensity0) ? e.baseline.intensity0 : null,
+        support: e?.action ? {
+          actionKey: "own", actionText: e.action.name || "", startedAt: e?.timer?.startAt || null,
+          endedAt: e?.outcome?.at || e?.timer?.endAt || null,
+          before: Number.isFinite(e?.baseline?.intensity0) ? e.baseline.intensity0 : null,
+          after: Number.isFinite(e?.outcome?.intensity1) ? e.outcome.intensity1 : null,
+          helpful: e?.outcome?.worked ?? null,
+          note: e?.outcome?.note || ""
+        } : null
+      });
+    }
+
+    const reviews = Array.isArray(legacy?.dailyReviews) ? legacy.dailyReviews : [];
+    for (const r of reviews) {
+      const memory = [r.achieved, r.improve, r.note].filter(Boolean).join("\n\n");
+      out.reflections.push({
+        id: uid(), date: r.date || dateKey(new Date(r.at || Date.now())), createdAt: r.at || iso(), alignment: "", memory,
+        continueTomorrow: false, legacyRating: Number.isFinite(r.rating) ? r.rating : null, source: "legacy-review"
+      });
+    }
+    return out;
+  }
+
+  function loadState() {
+    try {
+      const current = localStorage.getItem(STATE_KEY);
+      if (current) return normalizeState(JSON.parse(current));
+      for (const key of LEGACY_KEYS) {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const migrated = migrateLegacyState(JSON.parse(raw));
+          localStorage.setItem(STATE_KEY, JSON.stringify(migrated));
+          return normalizeState(migrated);
+        }
+      }
+    } catch (err) {
+      console.warn("Load failed", err);
+    }
+    return defaultState();
+  }
+
+  function saveState() {
+    try {
+      localStorage.setItem(STATE_KEY, JSON.stringify(STATE));
+      return true;
+    } catch (err) {
+      console.warn("Save failed", err);
+      toast(t("errors.save"));
+      return false;
+    }
+  }
+
+  let STATE = loadState();
+  let activeRecorder = null;
+  let activeStream = null;
+  let activeTimer = null;
+  let reloadAfterUpdate = false;
+
+  function applyTheme() {
+    const mode = STATE.settings.theme;
+    const dark = mode === "dark" || (mode === "system" && window.matchMedia?.("(prefers-color-scheme: dark)").matches);
+    document.documentElement.dataset.theme = dark ? "dark" : "light";
+    themeQuick.textContent = THEME_ICONS[mode] || "◐";
+    themeQuick.setAttribute("aria-label", t("settings.appearance"));
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.content = dark ? "#101713" : "#2f6b57";
+  }
+
+  function updateStaticText() {
+    document.documentElement.lang = STATE.settings.language;
+    document.title = `${t("appName")} · ${STATE.settings.language === "fr" ? "Inner Path" : "Chemin intérieur"}`;
+    document.getElementById("brandName").textContent = t("appName");
+    document.getElementById("brandSub").textContent = t("appSubtitle");
+    document.querySelectorAll("[data-i18n]").forEach(el => el.textContent = t(el.dataset.i18n));
+    langEn.classList.toggle("active", STATE.settings.language === "en");
+    langFr.classList.toggle("active", STATE.settings.language === "fr");
+    applyTheme();
+  }
+
+  function currentRoute() { return (location.hash || "#today").slice(1).split("/")[0]; }
+  function setRoute(route) { location.hash = route; }
+
+  function updateNav() {
+    const route = currentRoute();
+    document.querySelectorAll(".nav-button").forEach(btn => btn.classList.toggle("active", btn.dataset.route === route));
+  }
+
+  function todayIntention() { return STATE.intentions.find(x => x.date === dateKey()) || null; }
+  function todayReflection() { return STATE.reflections.find(x => x.date === dateKey()) || null; }
+  function momentsToday() { const d = dateKey(); return STATE.moments.filter(m => dateKey(new Date(m.createdAt)) === d); }
+
+  function greetingKey() {
+    const h = new Date().getHours();
+    if (h < 12) return "today.morning";
+    if (h < 18) return "today.afternoon";
+    return "today.evening";
+  }
+
+  function themeLabel(key) { return t(`intention.themes.${key || "other"}`); }
+  function momentTypeLabel(key) { return t(`moment.types.${key || "other"}`); }
+  function feelingLabel(key) { return key ? t(`moment.feelings.${key}`) : ""; }
+  function alignmentLabel(key) { return key ? t(`reflection.alignment.${key}`) : ""; }
+
+  function render() {
+    updateStaticText();
+    updateNav();
+    const route = currentRoute();
+    if (route === "today") renderToday();
+    else if (route === "record") renderMomentForm();
+    else if (route === "moments") renderMoments();
+    else if (route === "journey") renderJourney();
+    else if (route === "settings") renderSettings();
+    else renderToday();
+    requestAnimationFrame(maybePromptDaily);
+  }
+
+  function renderToday() {
+    const intention = todayIntention();
+    const reflection = todayReflection();
+    const recent = STATE.moments.slice().sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 3);
+
+    view.innerHTML = `
+      <div class="page">
+        <section class="hero">
+          <div class="hero-content">
+            <p class="eyebrow">${escapeHtml(fmtDate(new Date(), { weekday: "long", month: "long", day: "numeric" }))}</p>
+            <h1>${escapeHtml(t(greetingKey()))}</h1>
+            <p>${escapeHtml(t("today.intro"))}</p>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="card morning">
+            <div class="card-title">
+              <div class="card-icon">☀</div>
+              <div><h2>${escapeHtml(t("today.intentionTitle"))}</h2><p>${intention ? escapeHtml(themeLabel(intention.theme)) : escapeHtml(t("today.intentionEmpty"))}</p></div>
+            </div>
+            ${intention ? `
+              <div class="intention-text">${escapeHtml(intention.text || themeLabel(intention.theme))}</div>
+              ${intention.smallAction ? `<div class="small-action"><strong>${escapeHtml(t("today.smallAction"))}:</strong> ${escapeHtml(intention.smallAction)}</div>` : ""}
+              <div class="button-row"><span class="theme-chip">${THEME_ICONS_GROWTH[intention.theme] || "✎"} ${escapeHtml(themeLabel(intention.theme))}</span><div class="spacer"></div><button class="btn small" id="editIntention">${escapeHtml(t("today.editIntention"))}</button></div>
+            ` : `<div class="button-row"><button class="btn primary" id="setIntention">${escapeHtml(t("today.setIntention"))}</button></div>`}
+          </div>
+        </section>
+
+        <section class="section">
+          <button class="card moment quick-card" id="quickMoment" type="button" style="width:100%">
+            <div class="card-title"><div class="card-icon">✦</div><div><h3>${escapeHtml(t("today.recordTitle"))}</h3><p>${escapeHtml(t("today.recordText"))}</p></div></div>
+            <span class="arrow">→</span>
+          </button>
+        </section>
+
+        <section class="section">
+          <div class="card evening">
+            <div class="card-title">
+              <div class="card-icon">☾</div>
+              <div><h2>${escapeHtml(t("today.eveningTitle"))}</h2><p>${reflection ? escapeHtml(t("today.reflectionDone")) : escapeHtml(t("today.eveningEmpty"))}</p></div>
+            </div>
+            <div class="status-line"><span class="status-dot ${reflection ? "done" : ""}"></span>${escapeHtml(reflection ? t("common.done") : t("common.notDone"))}</div>
+            <div class="button-row"><button class="btn ${reflection ? "soft" : "primary"}" id="openReflection">${escapeHtml(t("today.reflectButton"))}</button></div>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-heading"><div><h2>${escapeHtml(t("today.recentTitle"))}</h2></div><button class="btn small" id="allMoments">${escapeHtml(t("common.view"))}</button></div>
+          <div class="timeline">${recent.length ? recent.map(momentCardHtml).join("") : `<div class="card flat empty"><span class="emoji">✦</span>${escapeHtml(t("today.noRecent"))}</div>`}</div>
+        </section>
+      </div>`;
+
+    document.getElementById("setIntention")?.addEventListener("click", () => openIntentionModal());
+    document.getElementById("editIntention")?.addEventListener("click", () => openIntentionModal(intention));
+    document.getElementById("quickMoment").addEventListener("click", () => setRoute("record"));
+    document.getElementById("openReflection").addEventListener("click", () => openReflectionModal());
+    document.getElementById("allMoments").addEventListener("click", () => setRoute("moments"));
+    bindMomentCardActions();
+  }
+
+  function openIntentionModal(existing = null) {
+    const selectedTheme = existing?.theme || "gratitude";
+    const modal = makeModal(`
+      <div class="modal-head"><div><h2>${escapeHtml(t("intention.title"))}</h2><p>${escapeHtml(t("intention.subtitle"))}</p></div><button class="icon-button close-button" data-close type="button">×</button></div>
+      <label>${escapeHtml(t("intention.themeLabel"))}</label>
+      <div class="choice-grid three">
+        ${Object.keys(I18N.en.intention.themes).map(key => `
+          <label class="choice"><input type="radio" name="theme" value="${key}" ${selectedTheme === key ? "checked" : ""}><span>${THEME_ICONS_GROWTH[key] || "✎"} ${escapeHtml(themeLabel(key))}</span></label>
+        `).join("")}
+      </div>
+      <label for="intentionText">${escapeHtml(t("intention.textLabel"))}</label>
+      <textarea id="intentionText" placeholder="${escapeHtml(t("intention.textPlaceholder"))}">${escapeHtml(existing?.text || "")}</textarea>
+      <p class="form-help">${escapeHtml(t("intention.freeFormHelp"))}</p>
+      <label for="smallAction">${escapeHtml(t("intention.actionLabel"))} <span class="optional">(${escapeHtml(t("common.optional"))})</span></label>
+      <input id="smallAction" value="${escapeHtml(existing?.smallAction || "")}" placeholder="${escapeHtml(t("intention.actionPlaceholder"))}" />
+      <div class="button-row end"><button class="btn" data-close>${escapeHtml(t("common.cancel"))}</button><button class="btn primary" id="saveIntention">${escapeHtml(t("common.save"))}</button></div>
+    `);
+
+    modal.querySelector("#saveIntention").addEventListener("click", () => {
+      const theme = modal.querySelector('input[name="theme"]:checked')?.value || "other";
+      const text = modal.querySelector("#intentionText").value.trim();
+      const smallAction = modal.querySelector("#smallAction").value.trim();
+      if (!text && theme === "other") { toast(t("intention.required")); return; }
+      const entry = existing || { id: uid(), date: dateKey(), createdAt: iso() };
+      Object.assign(entry, { theme, text, smallAction, updatedAt: iso() });
+      STATE.intentions = STATE.intentions.filter(x => x.date !== dateKey());
+      STATE.intentions.push(entry);
+      saveState();
+      closeModal(modal);
+      toast(t("common.saved"));
+      render();
+    });
+  }
+
+  function renderMomentForm() {
+    view.innerHTML = `
+      <div class="page">
+        <div class="section-heading"><div><h2>${escapeHtml(t("moment.title"))}</h2><p>${escapeHtml(t("moment.subtitle"))}</p></div></div>
+        <div class="card">
+          <label for="momentText">${escapeHtml(t("moment.whatLabel"))}</label>
+          <textarea id="momentText" placeholder="${escapeHtml(t("moment.whatPlaceholder"))}"></textarea>
+
+          <div class="button-row">
+            <button class="btn soft" id="addPhoto" type="button">📷 ${escapeHtml(t("common.addPhoto"))}</button>
+            <button class="btn soft" id="recordAudio" type="button">🎙 ${escapeHtml(t("common.recordAudio"))}</button>
+          </div>
+          <p class="form-help">${escapeHtml(t("moment.attachmentHelp"))}</p>
+          <div class="preview" id="attachmentPreview"></div>
+
+          <details class="optional-details">
+            <summary>${escapeHtml(t("moment.optionalDetails"))}</summary>
+            <div class="optional-details-body">
+              <label>${escapeHtml(t("moment.typeLabel"))}</label>
+              <div class="choice-grid" id="typeChoices">
+                ${["good","difficult","growth","remember","other"].map(key => `<label class="choice"><input type="radio" name="momentType" value="${key}"><span>${MOMENT_ICONS[key]} ${escapeHtml(t(`moment.types.${key}`))}</span></label>`).join("")}
+              </div>
+
+              <label>${escapeHtml(t("moment.feelingLabel"))} <span class="optional">(${escapeHtml(t("common.optional"))})</span></label>
+              <p class="form-help">${escapeHtml(t("moment.feelingOptional"))}</p>
+              <div class="choice-grid three">
+                ${["joy","gratitude","calm","pride","connection","fear","stress","sadness","anger","other"].map(key => `<label class="choice"><input type="radio" name="feeling" value="${key}"><span>${escapeHtml(t(`moment.feelings.${key}`))}</span></label>`).join("")}
+              </div>
+            </div>
+          </details>
+
+          <div id="difficultOptions" class="hidden difficult-note">
+            <strong>${escapeHtml(t("moment.difficultPrompt"))}</strong>
+          </div>
+
+          <div class="button-row end">
+            <button class="btn" id="cancelMoment">${escapeHtml(t("common.cancel"))}</button>
+            <button class="btn primary" id="saveMoment">${escapeHtml(t("moment.saveOnly"))}</button>
+            <button class="btn soft hidden" id="saveAndReset">${escapeHtml(t("moment.startReset"))}</button>
+          </div>
+        </div>
+      </div>`;
+
+    const draft = { photoId: null, audioId: null, photoUrl: null, audioUrl: null, recording: false };
+    const typeInputs = [...view.querySelectorAll('input[name="momentType"]')];
+    const difficultOptions = document.getElementById("difficultOptions");
+    const saveAndReset = document.getElementById("saveAndReset");
+
+    function updateDifficulty() {
+      const difficult = view.querySelector('input[name="momentType"]:checked')?.value === "difficult";
+      difficultOptions.classList.toggle("hidden", !difficult);
+      saveAndReset.classList.toggle("hidden", !difficult);
+    }
+    typeInputs.forEach(x => x.addEventListener("change", updateDifficulty));
+
+    function updatePreview() {
+      const preview = document.getElementById("attachmentPreview");
+      preview.innerHTML = "";
+      if (draft.photoUrl) {
+        const wrap = document.createElement("div");
+        wrap.innerHTML = `<img alt="${escapeHtml(t("moments.photo"))}" src="${draft.photoUrl}"><div class="button-row"><button class="btn small danger" data-remove-photo>${escapeHtml(t("common.remove"))}</button></div>`;
+        preview.appendChild(wrap);
+        wrap.querySelector("[data-remove-photo]").addEventListener("click", async () => {
+          await idbDelete(draft.photoId); URL.revokeObjectURL(draft.photoUrl); draft.photoId = null; draft.photoUrl = null; updatePreview();
+        });
+      }
+      if (draft.audioUrl) {
+        const wrap = document.createElement("div");
+        wrap.innerHTML = `<audio controls src="${draft.audioUrl}"></audio><div class="button-row"><button class="btn small danger" data-remove-audio>${escapeHtml(t("common.remove"))}</button></div>`;
+        preview.appendChild(wrap);
+        wrap.querySelector("[data-remove-audio]").addEventListener("click", async () => {
+          await idbDelete(draft.audioId); URL.revokeObjectURL(draft.audioUrl); draft.audioId = null; draft.audioUrl = null; updatePreview();
+        });
+      }
+    }
+
+    document.getElementById("addPhoto").addEventListener("click", () => {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = "image/*";
+      input.capture = "environment";
+      input.addEventListener("change", async () => {
+        const file = input.files?.[0];
+        if (!file) return;
+        try {
+          if (draft.photoId) await idbDelete(draft.photoId);
+          if (draft.photoUrl) URL.revokeObjectURL(draft.photoUrl);
+          const id = `photo-${uid()}`;
+          await idbPut(id, file);
+          draft.photoId = id;
+          draft.photoUrl = URL.createObjectURL(file);
+          updatePreview();
+          toast(t("moment.photoAttached"));
+        } catch (err) { console.warn(err); toast(t("moment.photoFailed")); }
+      });
+      input.click();
+    });
+
+    const audioButton = document.getElementById("recordAudio");
+    if (!canRecordAudio()) {
+      audioButton.disabled = true;
+      audioButton.title = t("moment.audioUnsupported");
+    } else {
+      audioButton.addEventListener("click", async () => {
+        if (draft.recording && activeRecorder) { activeRecorder.stop(); return; }
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          const chunks = [];
+          const type = preferredAudioType();
+          const recorder = type ? new MediaRecorder(stream, { mimeType: type }) : new MediaRecorder(stream);
+          activeRecorder = recorder; activeStream = stream; draft.recording = true;
+          audioButton.textContent = `■ ${t("common.stopRecording")}`;
+          audioButton.classList.add("danger");
+          recorder.ondataavailable = e => { if (e.data?.size) chunks.push(e.data); };
+          recorder.onstop = async () => {
+            stream.getTracks().forEach(track => track.stop());
+            activeRecorder = null; activeStream = null; draft.recording = false;
+            audioButton.textContent = `🎙 ${t("common.recordAudio")}`;
+            audioButton.classList.remove("danger");
+            const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
+            if (draft.audioId) await idbDelete(draft.audioId);
+            if (draft.audioUrl) URL.revokeObjectURL(draft.audioUrl);
+            const id = `audio-${uid()}`;
+            await idbPut(id, blob);
+            draft.audioId = id; draft.audioUrl = URL.createObjectURL(blob);
+            updatePreview();
+            toast(t("moment.audioAttached"));
+          };
+          recorder.start();
+        } catch (err) { console.warn(err); toast(t("moment.micBlocked")); }
+      });
+    }
+
+    document.getElementById("cancelMoment").addEventListener("click", async () => {
+      await cleanupUnsavedDraft(draft);
+      setRoute("today");
+    });
+
+    async function saveMoment(startPause) {
+      if (draft.recording && activeRecorder) { activeRecorder.stop(); toast(t("moment.audioRecording")); return; }
+      const type = view.querySelector('input[name="momentType"]:checked')?.value || "other";
+      const feeling = view.querySelector('input[name="feeling"]:checked')?.value || "";
+      const text = document.getElementById("momentText").value.trim();
+      if (!text && !draft.photoId && !draft.audioId) { toast(t("moment.nothing")); return; }
+      const entry = {
+        id: uid(), createdAt: iso(), type, feeling, text,
+        photoId: draft.photoId, audioId: draft.audioId,
+        intensity: null, source: "inner-path", support: null
+      };
+      STATE.moments.push(entry);
+      saveState();
+      draft.photoId = null; draft.audioId = null;
+      if (draft.photoUrl) URL.revokeObjectURL(draft.photoUrl);
+      if (draft.audioUrl) URL.revokeObjectURL(draft.audioUrl);
+      toast(t("common.saved"));
+      if (startPause) openResetModal(entry);
+      else setRoute("moments");
+    }
+
+    document.getElementById("saveMoment").addEventListener("click", () => saveMoment(false));
+    document.getElementById("saveAndReset").addEventListener("click", () => saveMoment(true));
+  }
+
+  async function cleanupUnsavedDraft(draft) {
+    if (draft.recording && activeRecorder) activeRecorder.stop();
+    if (draft.photoId) await idbDelete(draft.photoId);
+    if (draft.audioId) await idbDelete(draft.audioId);
+    if (draft.photoUrl) URL.revokeObjectURL(draft.photoUrl);
+    if (draft.audioUrl) URL.revokeObjectURL(draft.audioUrl);
+  }
+
+  function openResetModal(moment) {
+    if (!moment) return;
+    const modal = makeModal(`
+      <div class="modal-head"><div><h2>${escapeHtml(t("reset.title"))}</h2><p>${escapeHtml(t("reset.choose"))}</p></div><button class="icon-button close-button" data-close type="button">×</button></div>
+      <div class="choice-grid">
+        ${["breathe","walk","pause","write","reflect","talk","own"].map((key,i) => `<label class="choice"><input type="radio" name="resetAction" value="${key}" ${i===0?"checked":""}><span>${escapeHtml(t(`reset.actions.${key}`))}</span></label>`).join("")}
+      </div>
+      <div id="ownActionWrap" class="hidden"><label for="ownAction">${escapeHtml(t("reset.ownLabel"))}</label><input id="ownAction" placeholder="${escapeHtml(t("reset.ownPlaceholder"))}"></div>
+      <div class="button-row end"><button class="btn" data-close>${escapeHtml(t("common.cancel"))}</button><button class="btn primary" id="startReset">${escapeHtml(t("reset.start"))}</button></div>
+    `);
+    const ownWrap = modal.querySelector("#ownActionWrap");
+    modal.querySelectorAll('input[name="resetAction"]').forEach(r => r.addEventListener("change", () => ownWrap.classList.toggle("hidden", r.value !== "own" || !r.checked)));
+
+    modal.querySelector("#startReset").addEventListener("click", () => {
+      const actionKey = modal.querySelector('input[name="resetAction"]:checked')?.value || "breathe";
+      const actionText = actionKey === "own" ? modal.querySelector("#ownAction").value.trim() : "";
+      if (actionKey === "own" && !actionText) { modal.querySelector("#ownAction").focus(); return; }
+      moment.support = { actionKey, actionText, startedAt: iso(), endedAt: null, result: null, note: "" };
+      saveState(); closeModal(modal);
+      runResetTimer(moment);
+    });
+  }
+
+  function runResetTimer(moment) {
+    const duration = Math.max(1, Math.min(30, Number(STATE.settings.resetMinutes) || 5));
+    const endAt = Date.now() + duration * 60000;
+    const actionName = moment.support.actionKey === "own" ? moment.support.actionText : t(`reset.actions.${moment.support.actionKey}`);
+    const modal = makeModal(`
+      <div class="modal-head"><div><h2>${escapeHtml(t("reset.title"))}</h2><p>${escapeHtml(t("reset.running"))}</p></div></div>
+      <div class="card difficult flat" style="margin-top:15px"><strong>${escapeHtml(actionName)}</strong></div>
+      <div class="timer" id="resetTimer">${duration}:00</div>
+      <div class="button-row end"><button class="btn primary" id="finishReset">${escapeHtml(t("reset.finishEarly"))}</button></div>
+    `, { dismissible: false });
+
+    const tick = () => {
+      const ms = Math.max(0, endAt - Date.now());
+      modal.querySelector("#resetTimer").textContent = `${Math.floor(ms/60000)}:${String(Math.floor((ms%60000)/1000)).padStart(2,"0")}`;
+      if (ms <= 0) finish();
+    };
+    const finish = () => {
+      if (activeTimer) clearInterval(activeTimer);
+      activeTimer = null;
+      closeModal(modal);
+      openResetEvaluation(moment);
+    };
+    activeTimer = setInterval(tick, 1000); tick();
+    modal.querySelector("#finishReset").addEventListener("click", finish);
+  }
+
+  function openResetEvaluation(moment) {
+    const modal = makeModal(`
+      <div class="modal-head"><div><h2>${escapeHtml(t("reset.evaluate"))}</h2></div><button class="icon-button close-button" data-close type="button">×</button></div>
+      <label>${escapeHtml(t("reset.resultLabel"))}</label>
+      <div class="choice-grid">
+        ${["better","same","harder"].map(key => `<label class="choice"><input type="radio" name="pauseResult" value="${key}"><span>${escapeHtml(t(`reset.results.${key}`))}</span></label>`).join("")}
+      </div>
+      <label for="resetNote">${escapeHtml(t("reset.note"))} <span class="optional">(${escapeHtml(t("common.optional"))})</span></label>
+      <textarea id="resetNote"></textarea>
+      <div class="button-row end"><button class="btn primary" id="saveReset">${escapeHtml(t("reset.complete"))}</button></div>
+    `);
+    modal.querySelector("#saveReset").addEventListener("click", () => {
+      moment.support.endedAt = iso();
+      moment.support.result = modal.querySelector('input[name="pauseResult"]:checked')?.value || "";
+      moment.support.note = modal.querySelector("#resetNote").value.trim();
+      saveState(); closeModal(modal); toast(t("common.saved")); setRoute("moments");
+    });
+  }
+
+  function openReflectionModal() {
+    const intention = todayIntention();
+    const existing = todayReflection();
+    const modal = makeModal(`
+      <div class="modal-head"><div><h2>${escapeHtml(t("reflection.title"))}</h2><p>${escapeHtml(intention ? t("reflection.subtitle") : t("reflection.noIntention"))}</p></div><button class="icon-button close-button" data-close type="button">×</button></div>
+      ${intention ? `<div class="card morning flat" style="margin-top:14px"><span class="theme-chip">${THEME_ICONS_GROWTH[intention.theme] || "✎"} ${escapeHtml(themeLabel(intention.theme))}</span><div class="intention-text" style="font-size:1rem">${escapeHtml(intention.text || themeLabel(intention.theme))}</div></div>` : ""}
+      <label>${escapeHtml(t("reflection.alignmentLabel"))}</label>
+      <div class="choice-grid">
+        ${["well","little","difficult","forgot"].map(key => `<label class="choice"><input type="radio" name="alignment" value="${key}" ${existing?.alignment===key?"checked":""}><span>${escapeHtml(t(`reflection.alignment.${key}`))}</span></label>`).join("")}
+      </div>
+      <label for="reflectionMemory">${escapeHtml(t("reflection.rememberLabel"))} <span class="optional">(${escapeHtml(t("common.optional"))})</span></label>
+      <textarea id="reflectionMemory" placeholder="${escapeHtml(t("reflection.rememberPlaceholder"))}">${escapeHtml(existing?.memory || "")}</textarea>
+      ${intention ? `<label class="choice" style="margin-top:14px"><input id="continueTomorrow" type="checkbox" ${existing?.continueTomorrow?"checked":""}><span>↺ ${escapeHtml(t("reflection.continueLabel"))}</span></label>` : ""}
+      <div class="button-row end"><button class="btn" data-close>${escapeHtml(t("common.cancel"))}</button><button class="btn primary" id="saveReflection">${escapeHtml(t("common.save"))}</button></div>
+    `);
+
+    modal.querySelector("#saveReflection").addEventListener("click", () => {
+      const entry = existing || { id: uid(), date: dateKey(), createdAt: iso() };
+      entry.alignment = modal.querySelector('input[name="alignment"]:checked')?.value || "";
+      entry.memory = modal.querySelector("#reflectionMemory").value.trim();
+      entry.continueTomorrow = !!modal.querySelector("#continueTomorrow")?.checked;
+      entry.updatedAt = iso();
+      STATE.reflections = STATE.reflections.filter(x => x.date !== dateKey());
+      STATE.reflections.push(entry);
+      if (entry.continueTomorrow && intention) {
+        const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+        const tomorrowKey = dateKey(tomorrow);
+        if (!STATE.intentions.some(x => x.date === tomorrowKey)) STATE.intentions.push({ id: uid(), date: tomorrowKey, createdAt: iso(), theme: intention.theme, text: intention.text, smallAction: intention.smallAction, carriedForward: true });
+      }
+      saveState(); closeModal(modal); toast(t("reflection.saved")); render();
+    });
+  }
+
+  function renderMoments() {
+    const filter = safeSessionGet("innerPathMomentFilter", "all");
+    const moments = STATE.moments.slice().sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt)).filter(m => filter === "all" || m.type === filter);
+    view.innerHTML = `
+      <div class="page">
+        <div class="section-heading"><div><h2>${escapeHtml(t("moments.title"))}</h2><p>${escapeHtml(t("moments.subtitle"))}</p></div><button class="btn primary small" id="newMoment">＋ ${escapeHtml(t("today.recordButton"))}</button></div>
+        <div class="button-row" id="momentFilters" style="margin:0 0 15px">
+          ${["all","good","difficult","growth","remember"].map(key => `<button class="btn small ${filter===key?"soft":""}" data-filter="${key}">${escapeHtml(t(`moments.${key}`))}</button>`).join("")}
+        </div>
+        <div class="timeline">${moments.length ? moments.map(momentCardHtml).join("") : `<div class="card empty"><span class="emoji">✦</span>${escapeHtml(t("moments.empty"))}</div>`}</div>
+      </div>`;
+    document.getElementById("newMoment").addEventListener("click", () => setRoute("record"));
+    document.querySelectorAll("[data-filter]").forEach(btn => btn.addEventListener("click", () => { safeSessionSet("innerPathMomentFilter", btn.dataset.filter); renderMoments(); }));
+    bindMomentCardActions();
+  }
+
+  function momentCardHtml(moment) {
+    const tags = [];
+    if (moment.feeling) tags.push(feelingLabel(moment.feeling));
+    if (moment.source === "legacy-stress") tags.push(t("moments.legacyStress"));
+    if (moment.photoId) tags.push(`📷 ${t("moments.photo")}`);
+    if (moment.audioId) tags.push(`🎙 ${t("moments.audio")}`);
+    if (moment.support?.endedAt) tags.push(`≈ ${t("moments.supportResult")}`);
+    return `
+      <article class="entry-card" data-moment-card="${escapeHtml(moment.id)}">
+        <div class="entry-top">
+          <div class="entry-icon">${MOMENT_ICONS[moment.type] || "•"}</div>
+          <div class="entry-main">
+            <div class="entry-title">${escapeHtml(momentTypeLabel(moment.type))}</div>
+            <div class="entry-time">${escapeHtml(fmtDateTime(moment.createdAt))}</div>
+          </div>
+          <button class="btn small" data-view-moment="${escapeHtml(moment.id)}">${escapeHtml(t("common.view"))}</button>
+        </div>
+        ${moment.text ? `<div class="entry-text">${escapeHtml(moment.text)}</div>` : ""}
+        ${tags.length ? `<div class="entry-meta">${tags.map(x => `<span class="tag">${escapeHtml(x)}</span>`).join("")}</div>` : ""}
+      </article>`;
+  }
+
+  function bindMomentCardActions() {
+    document.querySelectorAll("[data-view-moment]").forEach(btn => btn.addEventListener("click", () => openMomentDetail(btn.dataset.viewMoment)));
+  }
+
+  async function openMomentDetail(id) {
+    const moment = STATE.moments.find(x => x.id === id);
+    if (!moment) { toast(t("errors.notFound")); return; }
+    const support = moment.support;
+    let supportHtml = "";
+    if (support) {
+      const actionName = support.actionKey === "own" ? support.actionText : t(`reset.actions.${support.actionKey}`);
+      let changeText = "";
+      if (support.result && ["better","same","harder"].includes(support.result)) {
+        changeText = `${t("reset.improvement")}: ${t(`reset.results.${support.result}`)}`;
+      } else if (Number.isFinite(support.before) && Number.isFinite(support.after)) {
+        const delta = support.before - support.after;
+        changeText = `${t("reset.improvement")}: ${delta > 0 ? t("reset.better") : delta < 0 ? t("reset.harder") : t("reset.same")}`;
+      }
+      supportHtml = `<div class="divider"></div><h3>≈ ${escapeHtml(t("moments.supportResult"))}</h3><p><strong>${escapeHtml(actionName)}</strong></p>${changeText ? `<span class="tag">${escapeHtml(changeText)}</span>` : ""}${support.note ? `<p>${escapeHtml(support.note)}</p>` : ""}`;
+    }
+    const modal = makeModal(`
+      <div class="modal-head"><div><h2>${MOMENT_ICONS[moment.type] || "•"} ${escapeHtml(momentTypeLabel(moment.type))}</h2><p>${escapeHtml(fmtDateTime(moment.createdAt))}</p></div><button class="icon-button close-button" data-close type="button">×</button></div>
+      ${moment.text ? `<p class="entry-text" style="font-size:1.02rem">${escapeHtml(moment.text)}</p>` : ""}
+      ${moment.feeling ? `<span class="tag">${escapeHtml(feelingLabel(moment.feeling))}</span>` : ""}
+      <div class="preview" id="detailAttachments"></div>
+      ${supportHtml}
+      <div class="button-row"><button class="btn danger small" id="deleteMoment">${escapeHtml(t("common.delete"))}</button></div>
+    `);
+    const attachmentEl = modal.querySelector("#detailAttachments");
+    const urls = [];
+    if (moment.photoId) {
+      const rec = await idbGet(moment.photoId).catch(() => null);
+      if (rec?.blob) { const url = URL.createObjectURL(rec.blob); urls.push(url); const img = document.createElement("img"); img.src = url; img.alt = t("moments.photo"); attachmentEl.appendChild(img); }
+    }
+    if (moment.audioId) {
+      const rec = await idbGet(moment.audioId).catch(() => null);
+      if (rec?.blob) { const url = URL.createObjectURL(rec.blob); urls.push(url); const audio = document.createElement("audio"); audio.controls = true; audio.src = url; attachmentEl.appendChild(audio); }
+    }
+    modal.addEventListener("modalclosed", () => urls.forEach(URL.revokeObjectURL), { once: true });
+    modal.querySelector("#deleteMoment").addEventListener("click", async () => {
+      if (!confirm(t("moments.confirmDelete"))) return;
+      if (moment.photoId) await idbDelete(moment.photoId);
+      if (moment.audioId) await idbDelete(moment.audioId);
+      STATE.moments = STATE.moments.filter(x => x.id !== id);
+      saveState(); closeModal(modal); toast(t("common.deleted")); render();
+    });
+  }
+
+  function renderJourney() {
+    const intentionCount = new Set(STATE.intentions.map(x => x.date)).size;
+    const reflectionCount = new Set(STATE.reflections.map(x => x.date)).size;
+    const themeCounts = {};
+    STATE.intentions.forEach(i => { if (i.theme) themeCounts[i.theme] = (themeCounts[i.theme] || 0) + 1; });
+    const sortedThemes = Object.entries(themeCounts).sort((a,b) => b[1]-a[1]);
+    const dates = [...new Set([...STATE.intentions.map(x=>x.date), ...STATE.reflections.map(x=>x.date), ...STATE.moments.map(x=>dateKey(new Date(x.createdAt)))])].sort().reverse().slice(0, 14);
+
+    view.innerHTML = `
+      <div class="page">
+        <div class="section-heading"><div><h2>${escapeHtml(t("journey.title"))}</h2><p>${escapeHtml(t("journey.subtitle"))}</p></div></div>
+        <div class="stats">
+          <div class="stat"><div class="stat-value">${intentionCount}</div><div class="stat-label">${escapeHtml(t("journey.intentions"))}</div></div>
+          <div class="stat"><div class="stat-value">${STATE.moments.length}</div><div class="stat-label">${escapeHtml(t("journey.moments"))}</div></div>
+          <div class="stat"><div class="stat-value">${reflectionCount}</div><div class="stat-label">${escapeHtml(t("journey.reflections"))}</div></div>
+        </div>
+
+        <section class="section card">
+          <div class="card-title"><div class="card-icon">◎</div><div><h2>${escapeHtml(t("journey.themeTitle"))}</h2></div></div>
+          ${sortedThemes.length ? `<div class="entry-meta" style="margin-top:16px">${sortedThemes.map(([key,count]) => `<span class="theme-chip">${THEME_ICONS_GROWTH[key] || "✎"} ${escapeHtml(themeLabel(key))} · ${count}</span>`).join("")}</div>` : `<div class="empty">${escapeHtml(t("journey.noTheme"))}</div>`}
+        </section>
+
+        <section class="section">
+          <div class="section-heading"><div><h2>${escapeHtml(t("journey.timelineTitle"))}</h2></div></div>
+          <div class="timeline">${dates.length ? dates.map(daySummaryHtml).join("") : `<div class="card empty"><span class="emoji">⌁</span>${escapeHtml(t("journey.noData"))}</div>`}</div>
+        </section>
+      </div>`;
+  }
+
+  function daySummaryHtml(day) {
+    const intention = STATE.intentions.find(x => x.date === day);
+    const reflection = STATE.reflections.find(x => x.date === day);
+    const moments = STATE.moments.filter(x => dateKey(new Date(x.createdAt)) === day);
+    return `<article class="entry-card">
+      <div class="entry-top"><div class="entry-icon">${day === dateKey() ? "●" : "○"}</div><div class="entry-main"><div class="entry-title">${escapeHtml(fmtDate(`${day}T12:00:00`, { weekday: "long", month: "short", day: "numeric" }))}</div></div></div>
+      <div class="entry-meta">
+        ${intention ? `<span class="tag">☀ ${escapeHtml(t("journey.workedOn"))}: ${escapeHtml(themeLabel(intention.theme))}</span>` : ""}
+        ${moments.length ? `<span class="tag">✦ ${moments.length} ${escapeHtml(t("journey.recorded"))}</span>` : ""}
+        ${reflection ? `<span class="tag">☾ ${escapeHtml(t("journey.reflected"))}${reflection.alignment ? `: ${escapeHtml(alignmentLabel(reflection.alignment))}` : ""}</span>` : ""}
+      </div>
+      ${reflection?.memory ? `<div class="entry-text">${escapeHtml(reflection.memory)}</div>` : intention?.text ? `<div class="entry-text">${escapeHtml(intention.text)}</div>` : ""}
+    </article>`;
+  }
+
+  function renderSettings() {
+    const s = STATE.settings;
+    view.innerHTML = `
+      <div class="page">
+        <div class="section-heading"><div><h2>${escapeHtml(t("settings.title"))}</h2><p>${escapeHtml(t("settings.subtitle"))}</p></div></div>
+        <div class="card settings-list">
+          <div class="setting-row"><div><h3>${escapeHtml(t("settings.language"))}</h3><p>${escapeHtml(t("settings.languageHelp"))}</p></div><select id="settingLanguage"><option value="en" ${s.language==="en"?"selected":""}>English</option><option value="fr" ${s.language==="fr"?"selected":""}>Français</option></select></div>
+          <div class="setting-row"><div><h3>${escapeHtml(t("settings.appearance"))}</h3><p>${escapeHtml(t("settings.appearanceHelp"))}</p></div><select id="settingTheme"><option value="system" ${s.theme==="system"?"selected":""}>${escapeHtml(t("settings.themeSystem"))}</option><option value="light" ${s.theme==="light"?"selected":""}>${escapeHtml(t("settings.themeLight"))}</option><option value="dark" ${s.theme==="dark"?"selected":""}>${escapeHtml(t("settings.themeDark"))}</option></select></div>
+          <div class="setting-row"><div><h3>${escapeHtml(t("settings.reminders"))}</h3><p>${escapeHtml(t("settings.remindersHelp"))}</p></div><select id="settingPrompts"><option value="true" ${s.promptsEnabled?"selected":""}>${escapeHtml(t("settings.enabled"))}</option><option value="false" ${!s.promptsEnabled?"selected":""}>${escapeHtml(t("settings.disabled"))}</option></select></div>
+          <div class="setting-row"><div><h3>${escapeHtml(t("settings.morningTime"))}</h3></div><input id="settingMorning" type="time" value="${escapeHtml(s.morningTime)}"></div>
+          <div class="setting-row"><div><h3>${escapeHtml(t("settings.eveningTime"))}</h3></div><input id="settingEvening" type="time" value="${escapeHtml(s.eveningTime)}"></div>
+          <div class="setting-row"><div><h3>${escapeHtml(t("settings.resetMinutes"))}</h3></div><select id="settingReset">${[3,5,7,10].map(n => `<option value="${n}" ${Number(s.resetMinutes)===n?"selected":""}>${n} ${escapeHtml(t("settings.minutes"))}</option>`).join("")}</select></div>
+          <div class="button-row end"><button class="btn primary" id="saveSettings">${escapeHtml(t("common.save"))}</button></div>
+        </div>
+
+        <section class="section card">
+          <div class="card-title"><div class="card-icon">⇩</div><div><h2>${escapeHtml(t("settings.dataTitle"))}</h2><p>${escapeHtml(t("settings.backupHelp"))}</p></div></div>
+          <div class="button-row"><button class="btn soft" id="downloadBackup">${escapeHtml(t("settings.backup"))}</button><button class="btn" id="restoreBackup">${escapeHtml(t("settings.restore"))}</button><button class="btn danger" id="clearData">${escapeHtml(t("settings.clear"))}</button></div>
+          <input id="backupInput" class="hidden" type="file" accept="application/json,.json">
+        </section>
+
+        <section class="section card">
+          <div class="card-title"><div class="card-icon">⌾</div><div><h2>${escapeHtml(t("settings.privacyTitle"))}</h2></div></div>
+          <p class="privacy-note">${escapeHtml(t("settings.privacyText"))}</p>
+          <p class="privacy-note">${escapeHtml(t("settings.storageText"))}</p>
+          ${s.migratedLegacy ? `<p class="privacy-note"><strong>${escapeHtml(t("settings.migration"))}</strong></p>` : ""}
+        </section>
+        <div class="version">${escapeHtml(t("settings.version"))} ${APP_VERSION}</div>
+      </div>`;
+
+    document.getElementById("saveSettings").addEventListener("click", () => {
+      s.language = document.getElementById("settingLanguage").value;
+      s.theme = document.getElementById("settingTheme").value;
+      s.promptsEnabled = document.getElementById("settingPrompts").value === "true";
+      s.morningTime = document.getElementById("settingMorning").value || "08:00";
+      s.eveningTime = document.getElementById("settingEvening").value || "20:00";
+      s.resetMinutes = Number(document.getElementById("settingReset").value) || 5;
+      saveState(); toast(t("settings.updated")); render();
+    });
+    document.getElementById("downloadBackup").addEventListener("click", downloadBackup);
+    document.getElementById("restoreBackup").addEventListener("click", () => document.getElementById("backupInput").click());
+    document.getElementById("backupInput").addEventListener("change", restoreBackup);
+    document.getElementById("clearData").addEventListener("click", clearAllData);
+  }
+
+  function downloadBackup() {
+    const payload = { app: "Inner Path", version: APP_VERSION, exportedAt: iso(), state: STATE };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `inner-path-backup-${dateKey()}.json`; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  async function restoreBackup(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const parsed = JSON.parse(await file.text());
+      const state = parsed.state || parsed;
+      if (!state || typeof state !== "object") throw new Error("Invalid");
+      STATE = normalizeState(state);
+      saveState(); toast(t("settings.restored")); render();
+    } catch (err) { console.warn(err); toast(t("settings.invalidBackup")); }
+    event.target.value = "";
+  }
+
+  async function clearAllData() {
+    if (!confirm(t("settings.clearConfirm"))) return;
+    await idbClear().catch(() => {});
+    STATE = defaultState();
+    localStorage.setItem(STATE_KEY, JSON.stringify(STATE));
+    toast(t("common.deleted")); render();
+  }
+
+  function makeModal(html, options = {}) {
+    const backdrop = document.createElement("div");
+    backdrop.className = "modal-backdrop";
+    backdrop.innerHTML = `<div class="modal" role="dialog" aria-modal="true">${html}</div>`;
+    document.body.appendChild(backdrop);
+    const modal = backdrop.querySelector(".modal");
+    modal._backdrop = backdrop;
+    modal.querySelectorAll("[data-close]").forEach(btn => btn.addEventListener("click", () => closeModal(modal)));
+    if (options.dismissible !== false) backdrop.addEventListener("click", e => { if (e.target === backdrop) closeModal(modal); });
+    return modal;
+  }
+
+  function closeModal(modal) {
+    if (!modal?._backdrop?.isConnected) return;
+    modal.dispatchEvent(new CustomEvent("modalclosed"));
+    modal._backdrop.remove();
+  }
+
+  function maybePromptDaily() {
+    if (!STATE.settings.promptsEnabled || document.querySelector(".modal-backdrop")) return;
+    const now = new Date();
+    const today = dateKey(now);
+    const current = minutesOfDay(now);
+    const morning = parseHHMM(STATE.settings.morningTime);
+    const evening = parseHHMM(STATE.settings.eveningTime);
+    if (!todayIntention() && morning !== null && current >= morning && current < (evening ?? 1200) && STATE.settings.lastMorningPromptDate !== today) {
+      STATE.settings.lastMorningPromptDate = today; saveState();
+      const modal = makeModal(`<div class="modal-head"><div><h2>${escapeHtml(t("prompt.morningTitle"))}</h2><p>${escapeHtml(t("prompt.morningText"))}</p></div><button class="icon-button close-button" data-close>×</button></div><div class="button-row end"><button class="btn" data-close>${escapeHtml(t("common.later"))}</button><button class="btn primary" id="promptMorning">${escapeHtml(t("today.setIntention"))}</button></div>`);
+      modal.querySelector("#promptMorning").addEventListener("click", () => { closeModal(modal); openIntentionModal(); });
+      return;
+    }
+    if (!todayReflection() && evening !== null && current >= evening && STATE.settings.lastEveningPromptDate !== today) {
+      STATE.settings.lastEveningPromptDate = today; saveState();
+      const modal = makeModal(`<div class="modal-head"><div><h2>${escapeHtml(t("prompt.eveningTitle"))}</h2><p>${escapeHtml(t("prompt.eveningText"))}</p></div><button class="icon-button close-button" data-close>×</button></div><div class="button-row end"><button class="btn" data-close>${escapeHtml(t("common.later"))}</button><button class="btn primary" id="promptEvening">${escapeHtml(t("today.reflectButton"))}</button></div>`);
+      modal.querySelector("#promptEvening").addEventListener("click", () => { closeModal(modal); openReflectionModal(); });
+    }
+  }
+
+  function canRecordAudio() { return !!(navigator.mediaDevices?.getUserMedia && window.MediaRecorder); }
+  function preferredAudioType() {
+    if (!window.MediaRecorder?.isTypeSupported) return "";
+    return ["audio/mp4", "audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus"].find(x => MediaRecorder.isTypeSupported(x)) || "";
+  }
+
+  function idbOpen() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, DB_VERSION);
+      req.onupgradeneeded = () => { if (!req.result.objectStoreNames.contains(BLOB_STORE)) req.result.createObjectStore(BLOB_STORE, { keyPath: "id" }); };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async function idbPut(id, blob) {
+    const db = await idbOpen();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(BLOB_STORE, "readwrite");
+      tx.objectStore(BLOB_STORE).put({ id, blob, mime: blob.type || "application/octet-stream", at: iso() });
+      tx.oncomplete = () => { db.close(); resolve(); };
+      tx.onerror = () => { db.close(); reject(tx.error); };
+    });
+  }
+  async function idbGet(id) {
+    if (!id) return null;
+    const db = await idbOpen();
+    return new Promise((resolve, reject) => {
+      const req = db.transaction(BLOB_STORE, "readonly").objectStore(BLOB_STORE).get(id);
+      req.onsuccess = () => { const result = req.result || null; db.close(); resolve(result); };
+      req.onerror = () => { db.close(); reject(req.error); };
+    });
+  }
+  async function idbDelete(id) {
+    if (!id) return;
+    const db = await idbOpen();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(BLOB_STORE, "readwrite"); tx.objectStore(BLOB_STORE).delete(id);
+      tx.oncomplete = () => { db.close(); resolve(); }; tx.onerror = () => { db.close(); reject(tx.error); };
+    });
+  }
+  async function idbClear() {
+    const db = await idbOpen();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(BLOB_STORE, "readwrite"); tx.objectStore(BLOB_STORE).clear();
+      tx.oncomplete = () => { db.close(); resolve(); }; tx.onerror = () => { db.close(); reject(tx.error); };
+    });
+  }
+
+  langEn.addEventListener("click", () => { STATE.settings.language = "en"; saveState(); render(); });
+  langFr.addEventListener("click", () => { STATE.settings.language = "fr"; saveState(); render(); });
+  themeQuick.addEventListener("click", () => {
+    const cycle = { system: "light", light: "dark", dark: "system" };
+    STATE.settings.theme = cycle[STATE.settings.theme] || "system"; saveState(); render();
+  });
+  document.querySelectorAll(".nav-button").forEach(btn => btn.addEventListener("click", () => setRoute(btn.dataset.route)));
+  window.addEventListener("hashchange", render);
+  window.matchMedia?.("(prefers-color-scheme: dark)").addEventListener?.("change", applyTheme);
+
+  try { navigator.storage?.persist?.(); } catch (_) {}
+
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("./sw.js").then(reg => {
+        reg.addEventListener("updatefound", () => {
+          const worker = reg.installing;
+          worker?.addEventListener("statechange", () => {
+            if (worker.state === "installed" && navigator.serviceWorker.controller) worker.postMessage({ type: "SKIP_WAITING" });
+          });
+        });
+      }).catch(err => console.warn("Service worker", err));
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (reloadAfterUpdate) return;
+        reloadAfterUpdate = true;
+        location.reload();
+      });
+    });
+  }
+
+  updateStaticText();
+  render();
+  setInterval(maybePromptDaily, 60000);
+})();
+</script>
+</body>
+</html>
