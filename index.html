@@ -309,7 +309,7 @@
       transform: translateX(-50%);
       width: min(94%, 620px);
       display: grid;
-      grid-template-columns: repeat(5, 1fr);
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 4px;
       padding: 7px;
       border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
@@ -329,9 +329,21 @@
       flex-direction: column;
       gap: 2px;
       align-items: center;
+      justify-content: center;
+      text-align: center;
+      min-height: 72px;
       cursor: pointer;
       font-size: .67rem;
       font-weight: 720;
+    }
+    .nav-button > span:last-child {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 1.15em;
+      line-height: 1.1;
+      text-align: center;
+      white-space: nowrap;
     }
     .nav-button .nav-icon { font-size: 1.12rem; line-height: 1.1; }
     .nav-button.active { color: var(--primary); background: var(--primary-soft); }
@@ -416,7 +428,7 @@
 
     <nav class="bottom-nav" id="bottomNav" aria-label="Main navigation">
       <button class="nav-button" data-route="today"><span class="nav-icon">⌂</span><span data-i18n="nav.today">Today</span></button>
-      <button class="nav-button" data-route="checkin"><span class="nav-icon">＋</span><span data-i18n="nav.checkin">Record a moment</span></button>
+      <button class="nav-button" data-route="checkin"><span class="nav-icon">＋</span><span data-i18n="nav.checkin">Record</span></button>
       <button class="nav-button" data-route="journey"><span class="nav-icon">⌁</span><span data-i18n="nav.journey">Journey</span></button>
       <button class="nav-button" data-route="settings"><span class="nav-icon">⚙</span><span data-i18n="nav.settings">Settings</span></button>
     </nav>
@@ -428,7 +440,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "1.3.0";
+  const APP_VERSION = "1.3.1";
   const STATE_KEY = "inner_path_app_v1";
   const LEGACY_KEYS = ["stress_loop_app_v4", "stress_loop_app_v3", "stress_loop_app_v2", "stress_loop_app"];
   const DB_NAME = "stress_loop_db"; // Kept to preserve existing photo/audio attachments.
@@ -439,7 +451,7 @@
     en: {
       appName: "Daily Reflection",
       appSubtitle: "Intention · Moments · Reflection",
-      nav: { today: "Today", checkin: "Record a moment", moments: "Moments", journey: "Journey", settings: "Settings" },
+      nav: { today: "Today", checkin: "Record", moments: "Moments", journey: "Journey", settings: "Settings" },
       common: {
         save: "Save", cancel: "Cancel", edit: "Edit", delete: "Delete", close: "Close", later: "Later",
         optional: "optional", other: "Other", addPhoto: "Add photo", recordAudio: "Record audio",
@@ -537,7 +549,7 @@
     fr: {
       appName: "Réflexion quotidienne",
       appSubtitle: "Intention · Moments · Réflexion",
-      nav: { today: "Aujourd’hui", checkin: "Noter un moment", moments: "Moments", journey: "Parcours", settings: "Réglages" },
+      nav: { today: "Aujourd’hui", checkin: "Noter", moments: "Moments", journey: "Parcours", settings: "Réglages" },
       common: {
         save: "Enregistrer", cancel: "Annuler", edit: "Modifier", delete: "Supprimer", close: "Fermer", later: "Plus tard",
         optional: "facultatif", other: "Autre", addPhoto: "Ajouter une photo", recordAudio: "Enregistrer un audio",
